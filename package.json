@@ -1,0 +1,27 @@
+{
+  "name": "@checksum-ai/runtime",
+  "version": "1.0.0",
+  "description": "Checksum.ai test runtime",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "playwright-test-cs": "npm:@playwright/test@^1.37.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/checksum-ai/checksum-ai-runtime.git"
+  },
+  "keywords": [
+    "checksum",
+    "playwright",
+    "test"
+  ],
+  "author": "checksum.ai",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/checksum-ai/checksum-ai-runtime/issues"
+  },
+  "homepage": "https://github.com/checksum-ai/checksum-ai-runtime#readme"
+}
