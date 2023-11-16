@@ -1,0 +1,1 @@
+Checksum npm package readme
