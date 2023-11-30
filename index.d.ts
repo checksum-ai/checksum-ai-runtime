@@ -53,7 +53,6 @@ export type ChecksumConfig = {
    */
   baseURL: string;
 
-  apiURL: string;
   /**
    * Account's username that will be used
    * to login into your testing environment
@@ -64,6 +63,7 @@ export type ChecksumConfig = {
    * to login into your testing environment
    */
   password?: string;
+
   options?: Partial<RuntimeOptions>;
 };
 

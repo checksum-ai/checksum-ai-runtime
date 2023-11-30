@@ -23,10 +23,5 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    {
-      name: "checksumpage",
-      use: { ...devices["Desktop Chrome"] },
-      testDir: "./src/lib/runtime",
-    },
   ],
 });

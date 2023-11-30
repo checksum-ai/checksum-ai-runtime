@@ -7,8 +7,13 @@ try {
   const packageJsonPath = path.join(process.cwd(), "package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath));
 
+  // verify that the package.json has a scripts section
+  if (!packageJson.scripts) {
+    packageJson.scripts = {};
+  }
+
   packageJson.scripts["checksum"] =
-    "node ./node_modules/@checksum-ai/runtime/cli.js";
+    "ts-node --esm --skipIgnore ./node_modules/@checksum-ai/runtime/cli.ts";
 
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 } catch (e) {
@@ -19,7 +24,7 @@ try {
 (async () => {
   try {
     console.log("Installing checksum files and folders");
-    await execCmd("npm run checksum install");
+    await execCmd("npm run checksum init");
   } catch (e) {
     console.log("Failed installing checksum files and folders, ", e);
     process.exit(1);
