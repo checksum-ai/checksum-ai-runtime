@@ -1,13 +1,14 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "playwright-test-cs": "npm:@playwright/test@1.37.0"
+    "@playwright/test": "1.37.0",
+    "ts-node": "^10.9.1"
   },
   "repository": {
     "type": "git",

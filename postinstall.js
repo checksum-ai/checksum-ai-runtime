@@ -13,7 +13,7 @@ try {
   }
 
   packageJson.scripts["checksum"] =
-    "ts-node --esm --skipIgnore ./node_modules/@checksum-ai/runtime/cli.ts";
+    "ts-node --esm --skipIgnore ./node_modules/@checksum-ai/runtime/cli.js";
 
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 } catch (e) {
