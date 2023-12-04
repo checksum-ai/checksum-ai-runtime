@@ -33,14 +33,14 @@ export default getChecksumConfig({
 
   options: {
     /**
-     * Whether to fallback to ESRA if the action selector is not found
+     * Whether to use Checksum Smart Selector when trying to locate elements
      */
-    actionsESRAfallback: true,
+    useChecksumSelectors: true,
 
     /**
-     * Whether to use LLM fallback if action selector is not found
+     * Whether to use Checksum AI when trying to locate elements
      */
-    actionsLLMFallback: true,
+    useChecksumAI: true,
 
     /**
      * Whether to use mock API data when running your tests

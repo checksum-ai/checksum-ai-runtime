@@ -15,13 +15,13 @@ export enum RunMode {
 
 export type RuntimeOptions = {
   /**
-   * fallback to ESRA if the action selector is not found
+   * Whether to use Checksum Smart Selector when trying to locate elements
    */
-  actionsESRAfallback: boolean;
+  useChecksumSelectors: boolean;
   /**
-   * use LLM fallback if action selector is not found
+   * Whether to use Checksum AI when trying to locate elements
    */
-  actionsLLMFallback: boolean;
+  useChecksumAI: boolean;
   /**
    * add new assertions
    */
