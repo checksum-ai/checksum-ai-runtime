@@ -4,6 +4,10 @@ const path = require("path");
 try {
   console.log("Adding checksum scripts to package.json");
   const packageJsonPath = path.resolve(__dirname, "../../../package.json");
+  if (!fs.existsSync(packageJsonPath)) {
+    console.log("No package.json found, will not add checksum script");
+    process.exit(1);
+  }
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath));
 
   // verify that the package.json has a scripts section
