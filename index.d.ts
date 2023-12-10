@@ -23,17 +23,29 @@ export type RuntimeOptions = {
    */
   useChecksumAI: boolean;
   /**
-   * add new assertions
+   * Add new assertions
    */
   newAssertionsEnabled: boolean;
   /**
-   * use mocked data
+   * Saves trace file at the end of the test
+   */
+  writeTraceFile: boolean;
+  /**
+   * Use mocked data
    */
   useMockData: boolean;
   /**
-   * print logs to console
+   * Print logs to console
    */
   printLogs: boolean;
+  /**
+   * Save reports on checksum hosting servers
+   */
+  hostReports?: boolean;
+  /**
+   * Create a new PR for auto healed tests
+   */
+  autoHealPRs?: boolean;
 };
 
 export type ChecksumConfig = {

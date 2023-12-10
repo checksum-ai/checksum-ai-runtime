@@ -1,6 +1,6 @@
 #!/bin/bash
 
-file="../../../playwright-core/lib/server/browserContext.js"
+file="node_modules/playwright-core/lib/server/browserContext.js"
 if [ "$2" == "root" ]; then
   file="./backend/$file"
 else
