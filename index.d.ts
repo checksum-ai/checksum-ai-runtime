@@ -27,10 +27,6 @@ export type RuntimeOptions = {
    */
   newAssertionsEnabled: boolean;
   /**
-   * Saves trace file at the end of the test
-   */
-  writeTraceFile: boolean;
-  /**
    * Use mocked data
    */
   useMockData: boolean;

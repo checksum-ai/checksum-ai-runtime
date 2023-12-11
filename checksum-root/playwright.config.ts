@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   timeout: 120000,
   testMatch: [/.*.[.]checksum.spec.ts/],
-  testDir: ".",
+  testDir: "..",
   /* disable parallel test runs */
   workers: 1,
   /* Run tests in files in parallel */
