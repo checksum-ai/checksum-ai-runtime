@@ -92,4 +92,5 @@ export function init(
     PlaywrightWorkerArgs & PlaywrightWorkerOptions
   >;
   login: ReturnType<typeof getLogin>;
+  defineChecksumTest: (title: string, testId: string) => string;
 };
