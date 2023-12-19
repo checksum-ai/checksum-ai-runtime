@@ -1,27 +1,62 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/**
+ * Read environment variables from file.
+ * https://github.com/motdotla/dotenv
+ */
+require("dotenv").config();
+
+/**
+ * See https://playwright.dev/docs/test-configuration.
+ */
 export default defineConfig({
-  timeout: 120000,
-  testMatch: [/.*.[.]checksum.spec.ts/],
   testDir: "..",
-  /* disable parallel test runs */
-  workers: 1,
+  /* Set test timeout to 10 minutes (relatively long) as Checksum implements its own timeout mechanism */
+  timeout: 1000 * 50 * 10,
   /* Run tests in files in parallel */
   fullyParallel: false,
+  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  forbidOnly: !!process.env.CI,
+  /* Retry on CI only */
+  retries: process.env.CI ? 2 : 0,
+  /* Opt out of parallel tests on CI. */
+  workers: process.env.CI ? 1 : 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "html",
+  reporter: process.env.CI
+    ? [["html", { open: "never", outputFolder: "test-results" }], ["line"]]
+    : "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
+    /* Base URL to use in actions like `await page.goto('/')`. */
+    // baseURL: 'http://127.0.0.1:3000',
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on",
     video: "on",
+    screenshot: "on",
+    locale: "en-US",
+    timezoneId: "America/Los_Angeles",
+    permissions: ["clipboard-read"],
+    actionTimeout: undefined, // Keep action timeout undefined as Checksum implements its own timeout
+  },
+  expect: {
+    toHaveScreenshot: { maxDiffPixelRatio: 0.05, maxDiffPixels: 200 },
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      testMatch: /^(?!.*refactored).*spec.*/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
     },
   ],
+  /* Run your local dev server before starting the tests */
+  // webServer: {
+  //   command: 'npm run start',
+  //   url: 'http://127.0.0.1:3000',
+  //   reuseExistingServer: !process.env.CI,
+  // },
 });
