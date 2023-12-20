@@ -37,7 +37,7 @@ export default defineConfig({
     locale: "en-US",
     timezoneId: "America/Los_Angeles",
     permissions: ["clipboard-read"],
-    actionTimeout: undefined, // Keep action timeout undefined as Checksum implements its own timeout
+    actionTimeout: 1000 * 5, // set action timeout for 5 seconds. In case an aciton times out, checksum's selectors will kick in.
   },
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.05, maxDiffPixels: 200 },
