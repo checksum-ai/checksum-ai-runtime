@@ -81,6 +81,11 @@ export function getChecksumConfig(
   config: Partial<ChecksumConfig>
 ): ChecksumConfig;
 
+/**
+ * Initialize Checksum runtime
+ *
+ * @param base
+ */
 export function init(
   base: TestType<
     PlaywrightTestArgs & PlaywrightTestOptions,
