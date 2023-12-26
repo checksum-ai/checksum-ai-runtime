@@ -1,6 +1,6 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "scripts": {
@@ -9,7 +9,7 @@
   "dependencies": {
     "@playwright/test": "1.37.0",
     "ts-node": "^10.9.1",
-    "@types/jsdom": "^21.1.2"
+    "jsdom": "^22.1.0"
   },
   "repository": {
     "type": "git",
