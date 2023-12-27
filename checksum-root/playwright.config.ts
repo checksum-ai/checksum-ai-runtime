@@ -47,7 +47,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testMatch: /^(?!.*refactored).*spec.*/,
+      testMatch: /checksum.spec/,
       use: {
         ...devices["Desktop Chrome"],
       },

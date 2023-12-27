@@ -16,6 +16,18 @@ export default getChecksumConfig({
    */
   baseURL: "<base URL>",
 
+  /**
+   * Insert the account's username that will be used
+   * to login into your testing environment
+   */
+    username: "<username>",
+
+    /**
+     * Insert the account's password that will be used
+     * to login into your testing environment
+     */
+    password: "<password>",
+
   options: {
     /**
      * Whether to use Checksum Smart Selector when an action fails (see README)

@@ -11,22 +11,22 @@ export default async function login(
    *
    * Example with Seed Function:
    */
-  const apiContext = await request.newContext();
-  const response = await apiContext.get("https://example.com/createseed");
-  const { username, password } = await response.json();
-  await page.goto("/login");
-  await page.getByPlaceholder("Email...").fill(process.env.username);
-  await page.getByPlaceholder("Password...").fill(process.env.password);
-  await page.getByText("Login").click();
-  await expect(page.getByText("Login Successful")).toBeVisible();
+  // const apiContext = await request.newContext();
+  // const response = await apiContext.get("https://example.com/createseed");
+  // const { username, password } = await response.json();
+  // await page.goto("/login");
+  // await page.getByPlaceholder("Email...").fill(process.env.username);
+  // await page.getByPlaceholder("Password...").fill(process.env.password);
+  // await page.getByText("Login").click();
+  // await expect(page.getByText("Login Successful")).toBeVisible();
 
   /**
    * Example with Default Username and Password:
    * This example demonstrates how to log in to a page using a predefined username and password from a config file.
    */
-  await page.goto("/login");
-  await page.getByPlaceholder("Email...").fill(config.username);
-  await page.getByPlaceholder("Password...").fill(config.password);
-  await page.getByText("Login").click();
-  await expect(page.getByText("Login Successful")).toBeVisible();
+  // await page.goto("/login");
+  // await page.getByPlaceholder("Email...").fill(config.username);
+  // await page.getByPlaceholder("Password...").fill(config.password);
+  // await page.getByText("Login").click();
+  // await expect(page.getByText("Login Successful")).toBeVisible();
 }
