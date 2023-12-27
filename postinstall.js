@@ -45,7 +45,7 @@ async function installPlaywright() {
     await run();
     console.log("Playwright installed successfully");
   } catch (e) {
-    console.error("Playwright installation failed", error);
+    console.error("Playwright installation failed", e);
   }
 }
 
