@@ -21,5 +21,28 @@ try {
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
 } catch (e) {
   console.log("Failed adding checksum scripts to package.json, ", e);
-  process.exit(1);
+}
+
+try {
+  function installPlaywright() {
+    return new Promise((resolve, reject) => {
+      exec("npx playwright install", (error, stdout, stderr) => {
+        if (error) {
+          reject(`Error: ${error.message}`);
+          return;
+        }
+        if (stderr) {
+          reject(`Stderr: ${stderr}`);
+          return;
+        }
+        resolve(stdout);
+      });
+    });
+  }
+
+  console.log("Installing playwright");
+  await installPlaywright();
+  console.log("Playwright installed successfully");
+} catch (e) {
+  console.error("Playwright installation failed", error);
 }
