@@ -1,5 +1,5 @@
 #################################
-# This file has two example Github workflows to run Checksum tests
+# This file has two example Github Action workflows to run Checksum tests
 # 1. Runs Checksum tests on every push or PR to main/master
 # 2. Runs the test using Docker container
 
