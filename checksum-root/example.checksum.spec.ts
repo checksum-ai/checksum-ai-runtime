@@ -4,7 +4,7 @@ import { init, IChecksumPage } from "@checksum-ai/runtime";
 
 const { test, defineChecksumTest, login } = init(base);
 
-test.describe("Taskboard", () => {
+test.describe("Example test", () => {
   test.beforeEach(async ({ page }: { page: IChecksumPage }) => {
     await login(page);
   });
