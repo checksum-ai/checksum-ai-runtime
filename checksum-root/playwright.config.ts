@@ -12,7 +12,7 @@ require("dotenv").config();
 export default defineConfig({
   testDir: "..",
   /* Set test timeout to 10 minutes (relatively long) as Checksum implements its own timeout mechanism */
-  timeout: 1000 * 50 * 10,
+  timeout: 1000 * 60 * 10,
   /* Run tests in files in parallel */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -37,7 +37,9 @@ export default defineConfig({
     locale: "en-US",
     timezoneId: "America/Los_Angeles",
     permissions: ["clipboard-read"],
-    actionTimeout: 1000 * 5, // set action timeout for 5 seconds. In case an aciton times out, checksum's selectors will kick in.
+    actionTimeout: 1000 * 5, // set action timeout for 5 seconds. When an action times out, checksum's Autonomus Agent kicks in and attempts to fix the test.
+    navigationTimeout: 1000 * 30, 
+
   },
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.05, maxDiffPixels: 200 },
