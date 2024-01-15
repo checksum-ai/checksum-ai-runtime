@@ -1,11 +1,8 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.49",
+  "version": "1.0.52",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
-  "scripts": {
-    "postinstall": "node postinstall.js"
-  },
   "dependencies": {
     "@playwright/test": "1.37.0",
     "ts-node": "^10.9.1",
