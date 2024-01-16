@@ -1,6 +1,6 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.52",
+  "version": "1.0.53",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "dependencies": {
@@ -17,6 +17,12 @@
     "checksum",
     "playwright",
     "test"
+  ],
+  "files": [
+    "checksum-root/*",
+    "checksum-root/.gitignore",
+    "scripts/*",
+    "*"
   ],
   "author": "checksum.ai",
   "license": "ISC",
