@@ -1,6 +1,6 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.55",
+  "version": "1.0.56",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "dependencies": {
@@ -20,7 +20,7 @@
   ],
   "files": [
     "checksum-root/*",
-    "checksum-root/.gitignore",
+    "checksum-root/.gitignore.example",
     "scripts/*",
     "*"
   ],
