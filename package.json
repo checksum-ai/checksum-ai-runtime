@@ -1,6 +1,6 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "1.0.61",
+  "version": "1.0.62",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "dependencies": {
