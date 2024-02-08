@@ -1,12 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-require("dotenv").config();
-
-/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -38,8 +32,7 @@ export default defineConfig({
     timezoneId: "America/Los_Angeles",
     permissions: ["clipboard-read"],
     actionTimeout: 1000 * 5, // set action timeout for 5 seconds. When an action times out, checksum's Autonomus Agent kicks in and attempts to fix the test.
-    navigationTimeout: 1000 * 30, 
-
+    navigationTimeout: 1000 * 30,
   },
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.05, maxDiffPixels: 200 },
