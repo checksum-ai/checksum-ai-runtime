@@ -1,7 +1,6 @@
 import { RunMode, getChecksumConfig } from "@checksum-ai/runtime";
 
-require("dotenv").config({ path: `${__dirname}/.env` })
-
+require("dotenv").config({ path: `${__dirname}/.env` });
 
 export default getChecksumConfig({
   /**
@@ -23,13 +22,13 @@ export default getChecksumConfig({
    * Insert the account's username that will be used
    * to login into your testing environment
    */
-    username: "<username>",
+  username: "<username>",
 
-    /**
-     * Insert the account's password that will be used
-     * to login into your testing environment
-     */
-    password: "<password>",
+  /**
+   * Insert the account's password that will be used
+   * to login into your testing environment
+   */
+  password: "<password>",
 
   options: {
     /**
