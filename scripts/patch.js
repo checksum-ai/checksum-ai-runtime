@@ -51,15 +51,48 @@ function replaceLine(filePath, lineNumber, originalLine, newLine) {
   fs.writeFileSync(filePath, updatedContent, "utf8");
 }
 
+// Replaces the content of the specified line in the file.
+// When "on" is true, the new line is written to the file,
+// otherwise the original line is restored.
+function replaceContent(filePath, originalContent, newContent) {
+  // Read the file content
+  const fileContent = fs.readFileSync(filePath, "utf8");
+
+  // add a marker for newContent that can be later recognized for "off" state
+  newContent = `/* checksumai */ ${newContent}`;
+
+  // Split the content into an array of lines
+  const lines = fileContent.split(/\r?\n/);
+
+  lines.forEach((line, index) => {
+    if (on) {
+      if (line.includes(originalContent)) {
+        lines[index] = line.replace(originalContent, newContent);
+      }
+    } else {
+      if (line.includes(newContent)) {
+        lines[index] = line.replace(newContent, originalContent);
+      }
+    }
+  });
+
+  // Join the lines back into a single string
+  const updatedContent = lines.join("\n");
+
+  // Write the modified content back to the file
+  fs.writeFileSync(filePath, updatedContent, "utf8");
+}
+
 // Remove conditions for injecting Playwright scripts
 function alwaysInjectScripts() {
   const file = "node_modules/playwright-core/lib/server/browserContext.js";
-  const lineNumber = 108;
-  const originalLine =
-    "    if ((0, _utils.debugMode)() === 'console') await this.extendInjectedScript(consoleApiSource.source);";
-  const newLine =
-    "    await this.extendInjectedScript(consoleApiSource.source);";
-  replaceLine(file, lineNumber, originalLine, newLine);
+  const originalContent =
+    "if ((0, _utils.debugMode)() === 'console') await this.extendInjectedScript(consoleApiSource.source);";
+
+  const newContent =
+    "await this.extendInjectedScript(consoleApiSource.source);";
+
+  replaceContent(file, originalContent, newContent);
 }
 
 // Add implementation for generateSelectorAndLocator and inject to Playwright console API
@@ -68,7 +101,7 @@ function addGenerateSelectorAndLocator() {
 
   const entryPointText1 = "this._generateLocator(element, language),\\n      ";
   const appendText1 =
-    "generateSelectorAndLocator: (element, language) => this._generateSelectorAndLocator(element, language),\\n      ";
+    "generateSelectorAndLocator: (element, language) => this._generateSelectorAndLocator(element, language),\\n asLocator,\\n     ";
   amend(file, entryPointText1, appendText1);
 
   const entryPointText2 =
@@ -80,3 +113,13 @@ function addGenerateSelectorAndLocator() {
 
 alwaysInjectScripts();
 addGenerateSelectorAndLocator();
+
+// function alwaysInjectScriptsOld() {
+//   const file = "node_modules/playwright-core/lib/server/browserContext.js";
+//   const lineNumber = 108;
+//   const originalLine =
+//     "    if ((0, _utils.debugMode)() === 'console') await this.extendInjectedScript(consoleApiSource.source);";
+//   const newLine =
+//     "    await this.extendInjectedScript(consoleApiSource.source);";
+//   replaceLine(file, lineNumber, originalLine, newLine);
+// }
