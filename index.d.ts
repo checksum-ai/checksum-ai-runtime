@@ -1,10 +1,8 @@
 import { Page } from "@playwright/test";
 
 export interface IChecksumPage extends Page {
-  initWithTest: (testInfo) => Promise<void>;
-  checksumId: (id: string) => IChecksumPage;
-  checksumStep: (thought: string, testFunction?: () => void) => IChecksumPage;
-  testId: (testId: string) => void;
+  checksumSelector: (id: string) => IChecksumPage;
+  checksumAI: (thought: string, testFunction?: () => void) => IChecksumPage;
 }
 
 export enum RunMode {
