@@ -1,10 +1,8 @@
 const fs = require("fs");
-const { join } = require("path");
 
 // Args
 const on = process.argv[2] !== "off";
 const fromRoot = process.argv[3] === "root";
-const projectRoot = process.env.PROJECT_ROOT ?? "";
 
 // Amends the file with the given entry point text and append text
 // When "on" is true, the append text is added to the entry point,
@@ -87,10 +85,7 @@ function replaceContent(filePath, originalContent, newContent) {
 
 // Remove conditions for injecting Playwright scripts
 function alwaysInjectScripts() {
-  const file = join(
-    projectRoot,
-    "node_modules/playwright-core/lib/server/browserContext.js"
-  );
+  const file = "node_modules/playwright-core/lib/server/browserContext.js";
   const originalContent =
     "if ((0, _utils.debugMode)() === 'console') await this.extendInjectedScript(consoleApiSource.source);";
 
@@ -102,10 +97,7 @@ function alwaysInjectScripts() {
 
 // Add implementation for generateSelectorAndLocator and inject to Playwright console API
 function addGenerateSelectorAndLocator() {
-  const file = join(
-    projectRoot,
-    "node_modules/playwright-core/lib/generated/consoleApiSource.js"
-  );
+  const file = "node_modules/playwright-core/lib/generated/consoleApiSource.js";
 
   const entryPointText1 = "this._generateLocator(element, language),\\n      ";
   const appendText1 =
