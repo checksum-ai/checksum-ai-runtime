@@ -1,8 +1,55 @@
-import { Page } from "@playwright/test";
+import { Expect, Page } from "@playwright/test";
 
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: (thought: string, testFunction?: () => void) => IChecksumPage;
+}
+
+class Wrapper<ExtendedMatchers, T> {
+  expecter: Expect<ExtendedMatchers>;
+  apply(e: T) {
+    return this.expecter<T>(e);
+  }
+  soft(e: T) {
+    return this.expecter.soft<T>(e);
+  }
+  poll(e: T) {
+    return this.expecter.poll<T>(() => e);
+  }
+}
+
+type Apply_MakeMatchers<ExtendedMatchers, T> = ReturnType<
+  Wrapper<ExtendedMatchers, T>["apply"]
+>;
+type Soft_MakeMatchers<ExtendedMatchers, T> = ReturnType<
+  Wrapper<ExtendedMatchers, T>["soft"]
+>;
+type Poll_MakeMatchers<ExtendedMatchers, T> = ReturnType<
+  Wrapper<ExtendedMatchers, T>["poll"]
+>;
+
+type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {
+  checksumAI: (thought: string) => MakeMatchers;
+};
+
+export interface IChecksumExpect<ExtendedMatchers = {}>
+  extends Expect<ExtendedMatchers> {
+  <T = unknown>(
+    actual: T,
+    messageOrOptions?: string | { message?: string }
+  ): ChecksumMakeMatchers<Apply_MakeMatchers<ExtendedMatchers, T>>;
+
+  soft: <T = unknown>(
+    actual: T,
+    messageOrOptions?: string | { message?: string }
+  ) => ChecksumMakeMatchers<Soft_MakeMatchers<ExtendedMatchers, T>>;
+
+  poll: <T = unknown>(
+    actual: () => T | Promise<T>,
+    messageOrOptions?:
+      | string
+      | { message?: string; timeout?: number; intervals?: number[] }
+  ) => ChecksumMakeMatchers<Poll_MakeMatchers<ExtendedMatchers, T>>;
 }
 
 export enum RunMode {
@@ -70,6 +117,9 @@ export type ChecksumConfig = {
    */
   password?: string;
 
+  /**
+   * Checksum runtime options
+   */
   options?: Partial<RuntimeOptions>;
 };
 
@@ -96,4 +146,5 @@ export function init(
   >;
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
+  expect: IChecksumExpect;
 };
