@@ -30,13 +30,13 @@ export default getChecksumConfig({
 
   options: {
     /**
-     * Whether to use Checksum Smart Selector when an action fails (see README)
+     * Whether to use Checksum Smart Selector in order to recover from failing to locate an element for an action (see README)
      */
     useChecksumSelectors: true,
     /**
-     * Whether to use Checksum AI when an action fails (see README)
+     * Whether to use Checksum AI in order to recover from a failed action or assertion (see README)
      */
-    useChecksumAI: true,
+    useChecksumAI: { actions: true, assertions: false },
     /**
      * Whether to use mock API data when running your tests (see README)
      */

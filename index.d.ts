@@ -60,13 +60,13 @@ export enum RunMode {
 
 export type RuntimeOptions = {
   /**
-   * Whether to use Checksum Smart Selector when trying to locate elements
+   * Whether to use Checksum Smart Selector when trying to locate an element to perform an action
    */
   useChecksumSelectors: boolean;
   /**
-   * Whether to use Checksum AI when trying to locate elements
+   * Whether to use Checksum AI when trying to perform an action or an assertion
    */
-  useChecksumAI: boolean;
+  useChecksumAI: boolean | { actions: boolean; assertions: boolean };
   /**
    * Add new assertions
    */
