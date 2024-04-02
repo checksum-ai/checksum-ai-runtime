@@ -1,4 +1,12 @@
-import { Expect, Page } from "@playwright/test";
+import {
+  Expect,
+  Page,
+  TestType,
+  PlaywrightTestArgs,
+  PlaywrightTestOptions,
+  PlaywrightWorkerArgs,
+  PlaywrightWorkerOptions,
+} from "@playwright/test";
 
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
@@ -129,21 +137,22 @@ export function getChecksumConfig(
   config: Partial<ChecksumConfig>
 ): ChecksumConfig;
 
+type ChecksumPlaywrightTestArgs = Omit<PlaywrightTestArgs, "page"> & {
+  page: IChecksumPage;
+};
+
+type ChecksumTestType<TestArgs> = TestType<
+  TestArgs & PlaywrightTestOptions,
+  PlaywrightWorkerArgs & PlaywrightWorkerOptions
+>;
+
 /**
  * Initialize Checksum runtime
  *
  * @param base
  */
-export function init(
-  base: TestType<
-    PlaywrightTestArgs & PlaywrightTestOptions,
-    PlaywrightWorkerArgs & PlaywrightWorkerOptions
-  >
-): {
-  test: TestType<
-    PlaywrightTestArgs & PlaywrightTestOptions,
-    PlaywrightWorkerArgs & PlaywrightWorkerOptions
-  >;
+export function init(base: ChecksumTestType<PlaywrightTestArgs>): {
+  test: ChecksumTestType<ChecksumPlaywrightTestArgs>;
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
   expect: IChecksumExpect;
