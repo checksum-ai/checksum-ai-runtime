@@ -3,14 +3,13 @@ const { join } = require("path");
 
 // Args
 const on = process.argv[2] !== "off";
-const fromRoot = process.argv[3] === "root";
-const projectRoot = process.env.PROJECT_ROOT ?? "";
+
+// -------- [Modifiers] -------- //
 
 // Amends the file with the given entry point text and append text
 // When "on" is true, the append text is added to the entry point,
 // otherwise the append text is completely removed from the file
 function amend(filePath, entryPointText, appendText) {
-  filePath = fromRoot ? `backend/${filePath}` : filePath;
   const data = fs.readFileSync(filePath, "utf8");
   if (!data.includes(entryPointText)) {
     throw new Error("Entry point not found!", entryPointText);
@@ -85,12 +84,25 @@ function replaceContent(filePath, originalContent, newContent) {
   fs.writeFileSync(filePath, updatedContent, "utf8");
 }
 
+function doesFileExist(filePath) {
+  if (!fs.existsSync(filePath)) {
+    console.warn("File not found", filePath);
+    return false;
+  }
+  return true;
+}
+
+// -------- [Modifications] -------- //
+
 // Remove conditions for injecting Playwright scripts
-function alwaysInjectScripts() {
+function alwaysInjectScripts(projectRoot) {
   const file = join(
     projectRoot,
     "node_modules/playwright-core/lib/server/browserContext.js"
   );
+  if (!doesFileExist(file)) {
+    return;
+  }
   const originalContent =
     "if ((0, _utils.debugMode)() === 'console') await this.extendInjectedScript(consoleApiSource.source);";
 
@@ -101,12 +113,14 @@ function alwaysInjectScripts() {
 }
 
 // Add implementation for generateSelectorAndLocator and inject to Playwright console API
-function addGenerateSelectorAndLocator() {
+function addGenerateSelectorAndLocator(projectRoot) {
   const file = join(
     projectRoot,
     "node_modules/playwright-core/lib/generated/consoleApiSource.js"
   );
-
+  if (!doesFileExist(file)) {
+    return;
+  }
   const entryPointText1 = "this._generateLocator(element, language),\\n      ";
   const appendText1 =
     "generateSelectorAndLocator: (element, language) => this._generateSelectorAndLocator(element, language),\\n asLocator,\\n     ";
@@ -119,8 +133,25 @@ function addGenerateSelectorAndLocator() {
   amend(file, entryPointText2, appendText2);
 }
 
-alwaysInjectScripts();
-addGenerateSelectorAndLocator();
+// -------- [Run] -------- //
+
+const projectRootFromEnv = process.env.PROJECT_ROOT;
+const projectPaths = projectRootFromEnv
+  ? [projectRootFromEnv]
+  : ["backend", "lib", "frontend"].map((project) =>
+      join(__dirname, "..", project)
+    );
+
+for (const projectPath of projectPaths) {
+  try {
+    if (fs.existsSync(projectPath)) {
+      alwaysInjectScripts(projectPath);
+      addGenerateSelectorAndLocator(projectPath);
+    }
+  } catch (e) {
+    console.warn("Unable to patch playwright", projectPath, e);
+  }
+}
 
 // function alwaysInjectScriptsOld() {
 //   const file = "node_modules/playwright-core/lib/server/browserContext.js";
