@@ -28,6 +28,23 @@ export default getChecksumConfig({
    */
   password: "<password>",
 
+  /**
+   * The credentials of the users that will be used to login into your testing environment
+   * Uncomment if you require support for multiple users
+   */
+  // users: [
+  //   {
+  //     role: "host",
+  //     username: "<host username>",
+  //     password: "<host password>",
+  //   },
+  //   {
+  //     role: "guest",
+  //     username: "<guest username>",
+  //     password: "<guest password>",
+  //   },
+  // ],
+
   options: {
     /**
      * Whether to use Checksum Smart Selector in order to recover from failing to locate an element for an action (see README)

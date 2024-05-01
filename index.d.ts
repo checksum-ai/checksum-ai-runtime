@@ -115,15 +115,25 @@ export type ChecksumConfig = {
   baseURL: string;
 
   /**
-   * Account's username that will be used
+   * The username/email that will be used
    * to login into your testing environment
    */
   username?: string;
   /**
-   * Account's password that will be used
+   * The password that will be used
    * to login into your testing environment
    */
   password?: string;
+
+  /**
+   * The credentials of the users that will be used to login into your testing environment
+   */
+  users?: {
+    role: string;
+    username?: string;
+    password?: string;
+    default?: boolean;
+  }[];
 
   /**
    * Checksum runtime options
@@ -131,7 +141,10 @@ export type ChecksumConfig = {
   options?: Partial<RuntimeOptions>;
 };
 
-export function getLogin(): (page: Page) => Promise<void>;
+export function getLogin(): (
+  page: Page,
+  { role }: { role?: string } = {}
+) => Promise<void>;
 
 export function getChecksumConfig(
   config: Partial<ChecksumConfig>

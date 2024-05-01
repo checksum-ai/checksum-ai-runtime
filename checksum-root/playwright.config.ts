@@ -29,7 +29,7 @@ export default defineConfig({
     video: "on",
     screenshot: "on",
     locale: "en-US",
-    timezoneId: "America/Los_Angeles",
+    timezoneId: "UTC",
     permissions: ["clipboard-read"],
     actionTimeout: 1000 * 5, // set action timeout for 5 seconds. When an action times out, checksum's Autonomus Agent kicks in and attempts to fix the test.
     navigationTimeout: 1000 * 30,
