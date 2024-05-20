@@ -8,9 +8,14 @@ import {
   PlaywrightWorkerOptions,
 } from "@playwright/test";
 
+interface ChecksumAIMethod {
+  (title: string): IChecksumPage;
+  <T>(title: string, body: () => T | Promise<T>): Promise<T>;
+}
+
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
-  checksumAI: (thought: string, testFunction?: () => void) => IChecksumPage;
+  checksumAI: ChecksumAIMethod;
   resolveAssetsFolder: (assets: string[]) => string[];
 }
 
