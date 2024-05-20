@@ -11,6 +11,7 @@ import {
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: (thought: string, testFunction?: () => void) => IChecksumPage;
+  resolveAssetsFolder: (assets: string[]) => string[];
 }
 
 class Wrapper<ExtendedMatchers, T> {
@@ -42,21 +43,31 @@ type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {
 
 export interface IChecksumExpect<ExtendedMatchers = {}>
   extends Expect<ExtendedMatchers> {
+  checksumAI: (thought: string) => IChecksumExpect<ExtendedMatchers>;
   <T = unknown>(
     actual: T,
-    messageOrOptions?: string | { message?: string }
+    messageOrOptions?:
+      | string
+      | { message?: string; checksumAI?: boolean | string }
   ): ChecksumMakeMatchers<Apply_MakeMatchers<ExtendedMatchers, T>>;
 
   soft: <T = unknown>(
     actual: T,
-    messageOrOptions?: string | { message?: string }
+    messageOrOptions?:
+      | string
+      | { message?: string; checksumAI?: boolean | string }
   ) => ChecksumMakeMatchers<Soft_MakeMatchers<ExtendedMatchers, T>>;
 
   poll: <T = unknown>(
     actual: () => T | Promise<T>,
     messageOrOptions?:
       | string
-      | { message?: string; timeout?: number; intervals?: number[] }
+      | {
+          message?: string;
+          timeout?: number;
+          intervals?: number[];
+          checksumAI?: boolean | string;
+        }
   ) => ChecksumMakeMatchers<Poll_MakeMatchers<ExtendedMatchers, T>>;
 }
 
@@ -169,4 +180,5 @@ export function init(base: ChecksumTestType<PlaywrightTestArgs>): {
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
   expect: IChecksumExpect;
+  checksumAI: (description: string, testFunction: Function) => Promise<any>;
 };
