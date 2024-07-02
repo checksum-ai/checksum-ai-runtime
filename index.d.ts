@@ -130,6 +130,8 @@ export type ChecksumConfig = {
    */
   baseURL: string;
 
+  environments?: ChecksumConfigEnvironment[];
+
   /**
    * The username/email that will be used
    * to login into your testing environment
@@ -155,6 +157,21 @@ export type ChecksumConfig = {
    * Checksum runtime options
    */
   options?: Partial<RuntimeOptions>;
+};
+
+export type ChecksumConfigEnvironment = {
+  name: string;
+  users?: EnvironmentUser[];
+  baseURL: string;
+  loginURL?: string;
+  default?: boolean;
+};
+
+export type EnvironmentUser = {
+  role: string;
+  username?: string;
+  password?: string;
+  default?: boolean;
 };
 
 export function getLogin(): (
