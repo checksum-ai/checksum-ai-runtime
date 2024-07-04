@@ -248,11 +248,17 @@ function channelOwner(projectRoot) {
 
 const isRuntime = true || process.env.RUNTIME === "true";
 const projectRootFromEnv = process.env.PROJECT_ROOT;
+
 const projectPaths = projectRootFromEnv
   ? [projectRootFromEnv]
-  : ["backend", "lib", "frontend", "runtime"].map((project) =>
-      join(__dirname, "..", project)
-    );
+  : [
+      ".",
+      "../checksum-ai-libs/lib",
+      "../backend",
+      "../libs/lib",
+      "../frontend",
+      "../runtime",
+    ].map((project) => join(process.cwd(), project));
 
 for (const projectPath of projectPaths) {
   try {
@@ -265,6 +271,8 @@ for (const projectPath of projectPaths) {
         testType(projectPath);
         channelOwner(projectPath);
       }
+    } else {
+      console.warn("Project path not found", projectPath);
     }
   } catch (e) {
     console.warn("Unable to patch playwright", projectPath, e);
