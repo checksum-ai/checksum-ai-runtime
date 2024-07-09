@@ -272,10 +272,10 @@ for (const projectPath of projectPaths) {
         channelOwner(projectPath);
       }
     } else {
-      console.warn("Project path not found", projectPath);
+      // console.warn("Project path not found", projectPath);
     }
   } catch (e) {
-    console.warn("Unable to patch playwright", projectPath, e);
+    // ignore
   }
 }
 
