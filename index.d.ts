@@ -176,7 +176,7 @@ export type EnvironmentUser = {
 
 export function getLogin(): (
   page: Page,
-  { role }: { role?: string } = {}
+  { role, environment }?: { role?: string; environment?: string }
 ) => Promise<void>;
 
 export function getChecksumConfig(
