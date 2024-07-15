@@ -17,6 +17,7 @@ export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: ChecksumAIMethod;
   resolveAssetsFolder: (assets: string[]) => string[];
+  getPage(index: number): Promise<IChecksumPage>;
 }
 
 class Wrapper<ExtendedMatchers, T> {
