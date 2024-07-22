@@ -204,4 +204,15 @@ export function init(base: ChecksumTestType<PlaywrightTestArgs>): {
   defineChecksumTest: (title: string, testId: string) => string;
   expect: IChecksumExpect;
   checksumAI: (description: string, testFunction: Function) => Promise<any>;
+  getEnvironment: ({
+    name,
+    userRole,
+  }: {
+    name?: string;
+    userRole?: string;
+  }) => {
+    environment: ChecksumConfigEnvironment;
+    user: EnvironmentUser;
+    login: ReturnType<typeof getLogin>;
+  };
 };
