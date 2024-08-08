@@ -48,7 +48,7 @@ async function start() {
 async function startWithRetry() {
   try {
     await start();
-  } catch (e) {
+  } catch (e: any) {
     await awaitSleep(2000);
     await startWithRetry();
   }
