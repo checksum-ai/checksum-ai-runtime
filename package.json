@@ -5,10 +5,10 @@
   "main": "index.js",
   "dependencies": {
     "@playwright/test": "1.46.0",
-    "ts-node": "^10.9.1",
     "jsdom": "^22.1.0",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "request": "^2.88.2"
+    "playwright-extra": "^4.3.6",
+    "request": "^2.88.2",
+    "ts-node": "^10.9.1"
   },
   "repository": {
     "type": "git",
