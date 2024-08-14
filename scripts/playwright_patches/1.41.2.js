@@ -215,6 +215,44 @@ function testType(projectRoot) {
   replaceContent(file, originalContent, newContent);
 }
 
+function indexContent(projectRoot) {
+  const file = join(projectRoot, "node_modules", "playwright", "lib", "index.js")
+  if (!doesFileExist) {
+    return;
+  }
+  let originalContent, newContent;
+  originalContent = `const browser = await playwright[browserName].launch();`
+  newContent = `
+    let browser = playwright[browserName];
+    try {
+      const { playwrightExtra } = testInfo?.project?.use || {};
+      if (playwrightExtra) {
+        const pw = require("playwright-extra");
+        const chromium = pw.chromium;
+        playwrightExtra.forEach((plugin) => {
+          try {
+            chromium.use(plugin);
+            console.log(\`CHECKSUM: Plugin [\${plugin.name}] loaded\`);
+          } catch (e) {
+            console.warn(
+              \`CHECKSUM: Plugin [\${plugin.name}] failed to load\`,
+              e
+            );
+          }
+        });
+        browser = chromium;
+      }
+    } catch (e) {
+      console.warn(
+        "CHECKSUM: Failed to load Playwright Extra, using Playwright instead.",
+        e
+      );
+    }
+    browser = await browser.launch();
+    `
+  replaceContent(file, originalContent, newContent)
+}
+
 function channelOwner(projectRoot) {
   const file = join(
     projectRoot,
@@ -258,6 +296,7 @@ function run(projectPath) {
         testInfo(projectPath);
         testType(projectPath);
         channelOwner(projectPath);
+        indexContent(projectPath);
       }
     } else {
       // console.warn("Project path not found", projectPath);

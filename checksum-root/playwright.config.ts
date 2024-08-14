@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { PuppeteerExtraPlugin } from "puppeteer-extra-plugin";
 
-
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
