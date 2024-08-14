@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import {PuppeteerExtraPlugin} from "puppeteer-extra-plugin";
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
-export default defineConfig({
+export default defineConfig<{playwrightExtra?:PuppeteerExtraPlugin[]}>({
   testDir: "..",
   /* Set test timeout to 10 minutes (relatively long) as Checksum implements its own timeout mechanism */
   timeout: 1000 * 60 * 10,
