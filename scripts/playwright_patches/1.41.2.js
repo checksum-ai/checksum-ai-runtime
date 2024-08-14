@@ -226,18 +226,19 @@ function indexContent(projectRoot) {
     let browser = playwright[browserName];
     try {
       const { playwrightExtra } = testInfo?.project?.use || {};
-      if (playwrightExtra) {
-        const pw = require("playwright-extra");
+      if (playwrightExtra && playwrightExtra?.length) {
+        const pw= require("playwright-extra")
+        const PupeteerExtraPlugin = require("puppeteer-extra-plugin").PuppeteerExtraPlugin
         const chromium = pw.chromium;
-        playwrightExtra.forEach((plugin) => {
+        
+        playwrightExtra.forEach((plugin, i) => {
           try {
+            if(!(plugin instanceof PupeteerExtraPlugin)){
+              console.warn(\`Plugin at index \${i} is not an instance of PupeteerExtraPlugin\`);
+            }
             chromium.use(plugin);
-            console.log(\`CHECKSUM: Plugin [\${plugin.name}] loaded\`);
           } catch (e) {
-            console.warn(
-              \`CHECKSUM: Plugin [\${plugin.name}] failed to load\`,
-              e
-            );
+            console.warn(e);
           }
         });
         browser = chromium;
