@@ -1,10 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
-import {PuppeteerExtraPlugin} from "puppeteer-extra-plugin";
+import { PuppeteerExtraPlugin } from "puppeteer-extra-plugin";
+
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
-export default defineConfig<{playwrightExtra?:PuppeteerExtraPlugin[]}>({
+export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
   testDir: "..",
   /* Set test timeout to 10 minutes (relatively long) as Checksum implements its own timeout mechanism */
   timeout: 1000 * 60 * 10,
@@ -46,6 +47,11 @@ export default defineConfig<{playwrightExtra?:PuppeteerExtraPlugin[]}>({
       testMatch: /checksum.spec/,
       use: {
         ...devices["Desktop Chrome"],
+        // To use playwright-extra plugins, import them and add them here
+        // See https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
+        // Example: 
+        // import StealthPlugin from "puppeteer-extra-plugin-stealth";
+        // playwrightExtra: [StealthPlugin()],
       },
     },
   ],
