@@ -229,7 +229,7 @@ function indexContent(projectRoot) {
       );
     }
     browser = await browser.launch();
-    `
+  `
   replaceContent(file, originalContent, newContent)
 }
 

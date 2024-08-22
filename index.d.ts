@@ -13,11 +13,16 @@ interface ChecksumAIMethod {
   <T>(title: string, body: () => T | Promise<T>): Promise<T>;
 }
 
+export interface IVariablesStore {
+  [key: string]: any;
+}
+
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: ChecksumAIMethod;
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
+  reauthenticate: (role: string) => Promise<void>;
 }
 
 class Wrapper<ExtendedMatchers, T> {
@@ -45,6 +50,7 @@ type Poll_MakeMatchers<ExtendedMatchers, T> = ReturnType<
 
 type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {
   checksumAI: (thought: string) => MakeMatchers;
+  withChecksumAI: () => Promise<void>;
 };
 
 export interface IChecksumExpect<ExtendedMatchers = {}>
@@ -186,6 +192,7 @@ export function getChecksumConfig(
 
 type ChecksumPlaywrightTestArgs = Omit<PlaywrightTestArgs, "page"> & {
   page: IChecksumPage;
+  variablesStore: IVariablesStore;
 };
 
 type ChecksumTestType<TestArgs> = TestType<
