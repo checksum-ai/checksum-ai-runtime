@@ -23738,7 +23738,7 @@
           tag: se.element.tagName.toLowerCase(),
           innerText: this.innerTextExtractor.extract(se.element),
           innerFeatures: this.innerFeaturesExtractor.extract(se.element),
-          classes: se.element.className?.trim().split(/\s+/) || [],
+          classes: Array.from(se.element.classList) || [],
           attributes: Array.from(se.element.attributes).reduce((acc, attr) => {
             if (!["class", "style", "id"].includes(attr.name)) {
               acc[attr.name] = attr.value;
