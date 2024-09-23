@@ -48,7 +48,7 @@ export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
         ...devices["Desktop Chrome"],
         // To use playwright-extra plugins, import them and add them here
         // See https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
-        // Example: 
+        // Example:
         // import StealthPlugin from "puppeteer-extra-plugin-stealth";
         // playwrightExtra: [StealthPlugin()],
       },
