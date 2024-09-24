@@ -6,6 +6,7 @@ import {
   PlaywrightTestOptions,
   PlaywrightWorkerArgs,
   PlaywrightWorkerOptions,
+  Locator,
 } from "@playwright/test";
 
 interface ChecksumAIMethod {
@@ -13,6 +14,9 @@ interface ChecksumAIMethod {
   <T>(title: string, body: () => T | Promise<T>): Promise<T>;
 }
 
+type EnumValues<T> = T[keyof T];
+
+export interface CompoundSelectorLocatorInterface extends PWLocators {}
 export interface IVariablesStore {
   [key: string]: any;
 }
@@ -20,22 +24,33 @@ export interface IVariablesStore {
 export interface IChecksumPage extends Page {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: ChecksumAIMethod;
+  /**
+   * Will create a compound selection that selects an element by grouping multiple locators
+   * and find the target element from their common root parent
+   *
+   * * **Usage**
+   *
+   * ```js
+   * await page.compoundSelection([
+   *  page.getByText('My first anchor'),
+   *  page.locator('selector to second anchor')
+   * ]).locator("<relative selector to target element>").click();
+   * ```
+   *
+   * @param locators Array of locators to group and calculate the common parent
+   * @returns CompoundSelectorLocatorInterface - a locator that will expect a locator method to point the target element
+   */
+  compoundSelection: (locators: Locator[]) => CompoundSelectorLocatorInterface;
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
   reauthenticate: (role: string) => Promise<void>;
 }
 
-class Wrapper<ExtendedMatchers, T> {
+declare class Wrapper<ExtendedMatchers, T> {
   expecter: Expect<ExtendedMatchers>;
-  apply(e: T) {
-    return this.expecter<T>(e);
-  }
-  soft(e: T) {
-    return this.expecter.soft<T>(e);
-  }
-  poll(e: T) {
-    return this.expecter.poll<T>(() => e);
-  }
+  apply(e: T);
+  soft(e: T);
+  poll(e: T);
 }
 
 type Apply_MakeMatchers<ExtendedMatchers, T> = ReturnType<
@@ -223,3 +238,17 @@ export function init(base: ChecksumTestType<PlaywrightTestArgs>): {
     login: ReturnType<typeof getLogin>;
   };
 };
+
+export enum Locators {
+  Locator = "locator",
+  GetByRole = "getByRole",
+  GetByText = "getByText",
+  GetByLabel = "getByLabel",
+  GetByPlaceholder = "getByPlaceholder",
+  GetByAltText = "getByAltText",
+  GetByTitle = "getByTitle",
+  GetByTestId = "getByTestId",
+  FrameLocator = "frameLocator",
+}
+
+export type PWLocators = Pick<Locator, EnumValues<typeof Locators>>;

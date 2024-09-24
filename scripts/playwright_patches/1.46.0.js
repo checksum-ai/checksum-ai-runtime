@@ -195,12 +195,18 @@ function testType(projectRoot) {
 }
 
 function indexContent(projectRoot) {
-  const file = join(projectRoot, "node_modules", "playwright", "lib", "index.js")
+  const file = join(
+    projectRoot,
+    "node_modules",
+    "playwright",
+    "lib",
+    "index.js"
+  );
   if (!doesFileExist) {
     return;
   }
   let originalContent, newContent;
-  originalContent = `const browser = await playwright[browserName].launch();`
+  originalContent = `const browser = await playwright[browserName].launch();`;
   newContent = `
     let browser = playwright[browserName];
     try {
@@ -229,8 +235,8 @@ function indexContent(projectRoot) {
       );
     }
     browser = await browser.launch();
-  `
-  replaceContent(file, originalContent, newContent)
+  `;
+  replaceContent(file, originalContent, newContent);
 }
 
 function channelOwner(projectRoot) {
@@ -258,6 +264,12 @@ function channelOwner(projectRoot) {
   appendText = `\nif (!isInternal && this._checksumTitle){
       apiName = this._checksumTitle;
       this._checksumTitle = undefined;
+    }`;
+  amend(file, entryPointText, appendText);
+
+  entryPointText = `if (isInternal) apiName = undefined;`;
+  appendText = `\nif (apiName && apiName.startsWith('proxy')) {
+      apiName = apiName.replace('proxy', 'page');
     }`;
   amend(file, entryPointText, appendText);
 }
