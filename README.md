@@ -113,6 +113,41 @@ Alongside standard test run configurations found in `playwright.config.ts`, use 
   }
 }
 ```
+## Playwright Configuration
+
+A Playwright configuration file  `playwright.config.ts` should be available to the Playwright tests runner in order to provide project configuration.
+For your convenience we extended the configuration to allow the addition of the `playwright-extra-plugins` packages.
+Available plugins can be found at https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
+
+To add a plugin:
+
+- Install it using your package manager (yarn, npm, pnpm)
+- Import the plugin in your `playwright.config.ts` file
+- In the `projects` definition under `use`, add it to the playwrightExtra array
+- Make sure to initialize the plugin before or during the addition to the array
+
+Example `playwright.config.ts` with the `puppeteer-extra-plugin-stealth` plugin:
+
+```js
+import { PuppeteerExtraPlugin } from "puppeteer-extra-plugin";
+import StealthPlugin from "puppeteer-extra-plugin-stealth"; // <--- Added import line
+
+export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
+  // ....
+  projects: [
+    {
+      name: "chromium",
+      testMatch: /checksum.spec/,
+      use: {
+        ...devices["Desktop Chrome"],
+        playwrightExtra: [StealthPlugin()], // <--- Initialized and added to the playwrightExtra array
+      },
+    },
+  ],
+});
+```
+
+**See more detailed instructions inside the `checksum-root/playwright.config.ts` file**
 
 ## Checksum Helpers API
 Helpers are deconstructed from the result of the initial call to the imported @checksum-ai/runtime `init` method, as following:
@@ -189,6 +224,23 @@ interface ChecksumPage extends Page {
   reauthenticate: (role: string) => Promise<void>;
 }
 
+```
+
+## ChecksumLocator API
+
+ChecksumLocator extends the existing Playwright Locator, adding the following functionality:
+
+```js
+interface ChecksumLocator extends Locator {
+  /*
+   * Click on certain text within the canvas element the locator chain points to.
+   * When more than one element with the same text exists, uses the rectSizeIndex
+   * to resolve the target element by its bounding box size, 0 being the largest.
+   * Example:
+   * await page.locator('canvas').canvasClick('graph-point-1', 1); // clicking on the 2nd largest
+   */
+  canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
+}
 ```
 
 
