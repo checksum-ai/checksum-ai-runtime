@@ -115,20 +115,22 @@ Alongside standard test run configurations found in `playwright.config.ts`, use 
 ```
 ## Playwright Configuration
 
-The Playwright package is extensible through the addition of playwright-extra-plugins.
+A Playwright configuration file  `playwright.config.ts` should be available to the Playwright tests runner in order to provide project configuration.
+For your convenience we extended the configuration to allow the addition of the `playwright-extra-plugins` packages.
 Available plugins can be found at https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
 
 To add a plugin:
 
-- install it using your package manager (yarn, npm, pnpm).
-- import the plugin in your `playwright.confg.ts` file
-- in the `projects` definition, add the plugin to the array:
+- Install it using your package manager (yarn, npm, pnpm)
+- Import the plugin in your `playwright.config.ts` file
+- In the `projects` definition under `use`, add it to the playwrightExtra array
+- Make sure to initialize the plugin before or during the addition to the array
 
-Example `playwright.config.ts`
+Example `playwright.config.ts` with the `puppeteer-extra-plugin-stealth` plugin:
 
 ```js
 import { PuppeteerExtraPlugin } from "puppeteer-extra-plugin";
-import StealthPlugin from "puppeteer-extra-plugin-stealth"; // Added import line
+import StealthPlugin from "puppeteer-extra-plugin-stealth"; // <--- Added import line
 
 export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
   // ....
@@ -138,8 +140,7 @@ export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
       testMatch: /checksum.spec/,
       use: {
         ...devices["Desktop Chrome"],
-        // Add StealthPlugin to playwrightExtra Plgun Array:
-        playwrightExtra: [StealthPlugin()],
+        playwrightExtra: [StealthPlugin()], // <--- Initialized and added to the playwrightExtra array
       },
     },
   ],
@@ -225,13 +226,20 @@ interface ChecksumPage extends Page {
 
 ```
 
-## Checksum Locators
+## ChecksumLocator API
 
-The Checksum Locators are additions to the existing Playwright Locators, that add functinoality for generated tests:
+ChecksumLocator extends the existing Playwright Locator, adding the following functionality:
 
 ```js
 interface ChecksumLocator extends Locator {
-  canvasClick: (canvasText: string, rectSize: number) => Promise<void>;
+  /*
+   * Click on certain text within the canvas element the locator chain points to.
+   * When more than one element with the same text exists, uses the rectSizeIndex
+   * to resolve the target element by its bounding box size, 0 being the largest.
+   * Example:
+   * await page.locator('canvas').canvasClick('graph-point-1', 1); // clicking on the 2nd largest
+   */
+  canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
 }
 ```
 
