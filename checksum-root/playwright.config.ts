@@ -50,7 +50,7 @@ export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
         // See https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
         // Example: 
         // import StealthPlugin from "puppeteer-extra-plugin-stealth";
-        playwrightExtra: [StealthPlugin()],
+        // playwrightExtra: [StealthPlugin()],
       },
     },
   ],
