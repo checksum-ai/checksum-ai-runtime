@@ -113,6 +113,41 @@ Alongside standard test run configurations found in `playwright.config.ts`, use 
 }
 ```
 
+## Playwright Configuration
+
+The Playwright package is extensible through the addition of playwright-extra-plugins.
+Available plugins can be found at https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
+
+To add a plugin:
+
+- install it using your package manager (yarn, npm, pnpm).
+- import the plugin in your `playwright.confg.ts` file
+- in the `projects` definition, add the plugin to the array:
+
+Example `playwright.config.ts`
+
+```js
+import { PuppeteerExtraPlugin } from "puppeteer-extra-plugin";
+import StealthPlugin from "puppeteer-extra-plugin-stealth"; // Added import line
+
+export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
+  // ....
+  projects: [
+    {
+      name: "chromium",
+      testMatch: /checksum.spec/,
+      use: {
+        ...devices["Desktop Chrome"],
+        // Add StealthPlugin to playwrightExtra Plgun Array:
+        playwrightExtra: [StealthPlugin()],
+      },
+    },
+  ],
+});
+```
+
+**See more detailed instructions inside the `checksum-root/playwright.config.ts` file**
+
 ## Checksum Helpers API
 
 Helpers are deconstructed from the result of the initial call to the imported @checksum-ai/runtime `init` method, as following:
