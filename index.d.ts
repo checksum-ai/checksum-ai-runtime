@@ -44,6 +44,18 @@ export interface IChecksumPage extends Page {
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
   reauthenticate: (role: string) => Promise<void>;
+  locator(
+    selector: string,
+    options?: {
+      has?: Locator;
+      hasNot?: Locator;
+      hasNotText?: string | RegExp;
+      hasText?: string | RegExp;
+    }
+  ): ChecksumLocator;
+}
+export interface ChecksumLocator extends Locator {
+  canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
 }
 
 declare class Wrapper<ExtendedMatchers, T> {
