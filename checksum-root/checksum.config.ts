@@ -1,4 +1,6 @@
 import { RunMode, getChecksumConfig } from "@checksum-ai/runtime";
+import { resolve } from "path";
+require("dotenv").config({ path: resolve(__dirname, ".env") });
 
 export default getChecksumConfig({
   /**

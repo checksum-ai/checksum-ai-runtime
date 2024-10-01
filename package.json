@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "@playwright/test": "1.46.0",
+    "dotenv": "^16.4.5",
     "jsdom": "^22.1.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin": "^3.2.3",
