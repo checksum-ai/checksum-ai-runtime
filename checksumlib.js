@@ -9861,7 +9861,8 @@
     "[type=button]",
     "[aria-disabled=false]",
     '[id^="react-select"]',
-    "label[for]"
+    "label[for]",
+    "canvas"
   ];
   var InteractableCursorValues = [
     "pointer",
