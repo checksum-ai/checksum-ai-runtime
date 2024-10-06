@@ -22885,6 +22885,14 @@
     return str.substring(0, firstParantheses + 1) + "`" + str.substring(firstParantheses + 2, str.length - 2) + "`)";
   }
   __name(replaceLocatorQuotesWithTicks, "replaceLocatorQuotesWithTicks");
+  function getElementWindowPlaywright(node) {
+    const elementWindow = node.ownerDocument.defaultView;
+    if (elementWindow !== window && !elementWindow.playwright) {
+      elementWindow.playwright = window.playwright;
+    }
+    return elementWindow.playwright;
+  }
+  __name(getElementWindowPlaywright, "getElementWindowPlaywright");
   var COVERED_ATTRIBUTES = [
     "role",
     "aria-label",
@@ -22903,7 +22911,8 @@
     "style",
     "href",
     "src",
-    "path"
+    "path",
+    "type"
   ];
 
   // ../../node_modules/css-selector-generator/esm/utilities-iselement.js
@@ -23592,6 +23601,7 @@
   }, "guardReturn");
 
   // src/lib/test-generator/selectors/pw-custom-locator-generator.ts
+  var DEBUG_MODE = false;
   var PlaywrightCustomLocatorGenerator = class _PlaywrightCustomLocatorGenerator {
     constructor(rootNode = document) {
       this.rootNode = rootNode;
@@ -23871,7 +23881,9 @@
           });
           element = element.parentElement;
         }
-        console.log("Added CSS key features", added);
+        if (added.length) {
+          console.log("Added CSS key features", added);
+        }
       } catch (error) {
         console.error("Error extracting CSS key features", error);
       }
@@ -23995,13 +24007,6 @@
         console.error("[filterListItemsSelectors] error", error.message);
       }
     }
-    getElementWindowPlaywright(node) {
-      const elementWindow = node.ownerDocument.defaultView;
-      if (elementWindow !== window && !elementWindow.playwright) {
-        elementWindow.playwright = window.playwright;
-      }
-      return elementWindow.playwright;
-    }
     /**
      * Returns the relevant locator for testing the element
      * If we are generating a relative selector - returns playwright entry point
@@ -24010,7 +24015,7 @@
      * @returns Locator or playwright entry point
      */
     getLocatorBase(element) {
-      const playwright = this.getElementWindowPlaywright(element);
+      const playwright = getElementWindowPlaywright(element);
       if (this.rootNode === document) {
         return playwright;
       }
@@ -24020,9 +24025,10 @@
      * Returns locator representation of a selector
      */
     getSelectorLocator(selector, element) {
-      return this.getElementWindowPlaywright(
-        element ?? this.targetElement
-      ).asLocator("javascript", selector);
+      return getElementWindowPlaywright(element ?? this.targetElement).asLocator(
+        "javascript",
+        selector
+      );
     }
     /**
      * This method tries to reduce the number of elements returned by the selectors that return multiple elements
@@ -24175,16 +24181,31 @@
             )
           ]);
         }
-        let val = element.getAttribute("aria-label") ?? element.getAttribute("aria-labelledby") ?? (options.useTextContent ? normalizeWhiteSpace(elementText(element).full) : "");
-        const { text: name, exact } = this.limitTextLength(
-          this.normalize(val),
-          options.exact
-        );
+        const getAccessibleName = /* @__PURE__ */ __name(() => {
+          const normalize = /* @__PURE__ */ __name((txt) => this.limitTextLength(this.normalize(txt), options.exact), "normalize");
+          const none = { text: "", exact: false };
+          const attributeVal = element.getAttribute("aria-label") ?? element.getAttribute("aria-labelledby") ?? element.getAttribute("title");
+          if (attributeVal) {
+            return normalize(attributeVal);
+          }
+          const text = normalizeWhiteSpace(elementText(element).full);
+          if (!text?.length) {
+            return none;
+          }
+          const textVal = normalize(text);
+          if (this.usedFilters.hasText.includes(textVal.text)) {
+            return none;
+          }
+          this.usedFilters.hasText.push(textVal.text);
+          return textVal;
+        }, "getAccessibleName");
+        const { text: name, exact } = getAccessibleName();
         if (name && name.length > 0 && name.length < 30) {
           props.push(["name", escapeForAttributeSelector(name, exact)]);
         }
         return options.returnLocator ? `getByRole('${role}', { ${props.join(", ")} })` : `internal:role=${role}${props.map(([n2, v2]) => `[${n2}=${v2}]`).join("")}`;
       } catch (error) {
+        console.error("Error getting role locator", error);
       }
     }
     getByTextLocator(element, options = {}) {
@@ -24197,10 +24218,7 @@
           return;
         }
         if (Array.from(element.children).filter((el) => el instanceof HTMLElement).some(
-          // (child) => (child as HTMLElement).innerText === textContent
           (child) => normalizeWhiteSpace(elementText(child).full) === text
-          //   this.normalize((child as HTMLElement).textContent) === text
-          //   this.normalize((child as HTMLElement).textContent) === text
         )) {
           if (!this.usedFilters.hasText.includes(text)) {
             this.usedFilters.hasText.push(text);
@@ -24305,7 +24323,9 @@
       return { text, exact };
     }
     checkTimeout(throwError = true) {
-      return false;
+      if (DEBUG_MODE) {
+        return false;
+      }
       if (this.MAX_PROCESSING_TIME && Date.now() - this.startTimestamp > this.MAX_PROCESSING_TIME) {
         if (throwError) {
           throw new TimeoutError();
@@ -24408,7 +24428,10 @@
           ).filter((s2) => s2 && s2.trim().length > 0),
           playwrightSelectors: await new PlaywrightCustomLocatorGenerator(
             commonRoot
-          ).generate(targetElement.element),
+          ).generate(targetElement.element, [], {
+            addCSSSelectorGenerator: false,
+            expandCSSKeyElements: false
+          }),
           featuresMetadata: targetElement.featuresMetadata
         },
         contextElements
@@ -24430,13 +24453,14 @@
         }
       });
       const commonParents = this.getSmallestCommonParents(elementGroups).map(this.calculateElementSize).sort((a2, b) => a2.size - b.size).map((e2) => e2.element);
-      for (const cp of commonParents) {
-        const locator = window.playwright.locator(window.playwright.selector(cp));
-        const { element } = locator.locator(targetSelector);
-        if (element) {
-          return window.playwright.selector(element);
-        }
+      if (!targetSelector) {
+        return commonParents.map((cp) => getElementWindowPlaywright(cp).selector(cp)).filter((s2) => s2);
       }
+      return commonParents.map((cp) => {
+        const playwright = getElementWindowPlaywright(cp);
+        const { element } = playwright.locator(playwright.selector(cp)).locator(targetSelector);
+        return element ? playwright.selector(element) : null;
+      }).filter((e2) => e2);
     }
     /**
      * Performs a compound selection from metadata
@@ -24465,10 +24489,10 @@
             compoundSelector.targetSelection
           );
           if (histogram.size > 0) {
-            const { selector, locator } = await new PlaywrightElementSelectorGenerator().getSelectorAndLocator(
-              histogram.entries().next().value[0]
+            const selectors = Array.from(histogram.keys()).slice(0, 20).map(
+              (el) => getElementWindowPlaywright(el).generateSelectorAndLocator(el)
             );
-            return { selector, locator };
+            return selectors;
           }
         }
       }
@@ -24492,7 +24516,7 @@
       targetSelection.cssSelectors.forEach((selector) => {
         try {
           addElementstoHistogram(
-            Array.from(commonParent.querySelectorAll(selector))
+            querySelectorAllExtended(selector, commonParent)
           );
         } catch (error) {
         }
@@ -24638,7 +24662,7 @@
         (combination) => this.createContextualSelector(commonRoot, target, combination)
       ).filter((s2) => s2).filter((s2) => {
         try {
-          const result = commonRoot.querySelectorAll(s2);
+          const result = querySelectorAllExtended(s2, commonRoot);
           return result.length === 1 && result[0] === target;
         } catch (error) {
           return false;
@@ -24771,7 +24795,7 @@
     getSmallestCommonParentsFromMetadata(contextElements) {
       const elementsBySelector = contextElements.map((ce) => {
         try {
-          const elements = Array.from(document.querySelectorAll(ce.selector));
+          const elements = querySelectorAllExtended(ce.selector);
           return ce.selection.type === "content" ? elements.filter(
             (element) => element.textContent === ce.selection.value
           ) : elements;

@@ -7,6 +7,7 @@ import {
   PlaywrightWorkerArgs,
   PlaywrightWorkerOptions,
   Locator,
+  FrameLocator,
 } from "@playwright/test";
 
 interface ChecksumAIMethod {
@@ -21,26 +22,13 @@ export interface IVariablesStore {
   [key: string]: any;
 }
 
-export interface IChecksumPage extends Page {
+export interface IChecksumPage
+  extends Omit<Page, "frameLocator">,
+    CompoundSelectionInterface,
+    FrameLocatorOwner {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: ChecksumAIMethod;
-  /**
-   * Will create a compound selection that selects an element by grouping multiple locators
-   * and find the target element from their common root parent
-   *
-   * * **Usage**
-   *
-   * ```js
-   * await page.compoundSelection([
-   *  page.getByText('My first anchor'),
-   *  page.locator('selector to second anchor')
-   * ]).locator("<relative selector to target element>").click();
-   * ```
-   *
-   * @param locators Array of locators to group and calculate the common parent
-   * @returns CompoundSelectorLocatorInterface - a locator that will expect a locator method to point the target element
-   */
-  compoundSelection: (locators: Locator[]) => CompoundSelectorLocatorInterface;
+
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
   reauthenticate: (role: string) => Promise<void>;
@@ -54,7 +42,78 @@ export interface IChecksumPage extends Page {
     }
   ): ChecksumLocator;
 }
-export interface ChecksumLocator extends Locator {
+
+export interface CompoundSelectionInterface {
+  /**
+   * Will create a compound selection that selects elements by grouping multiple locators as anchors
+   * and finding the target elements from their common root parent
+   *
+   * **Usage example**
+   *
+   * ```js
+   * await page.compoundSelection(
+   *  (base) => [base.getByText("<selector to first anchor>""), page.locator("selector to second anchor"), "<text content of third anchor>"],
+   *  (base) => base.locator("<relative selector to target element>")
+   * ]).first().click();
+   * ```
+   *
+   * @param anchors Method that returns array of locators to group and calculate the common parent from.
+   *                The method receives the base locator as an argument, which is the locator that the compound selection is called on.
+   *                The method should return an array of locators or strings that point at the anchor elements.
+   * @param target [optional] Method that returns the relative locator or string content that will point at the target element from the common parent
+   *               that was calculated from the anchors.
+   *               If no target is provided, the compound selection will return a locator to the common parents.
+   */
+  compoundSelection?(
+    anchors: (base: Locator) => Array<Locator | string>,
+    target?: (base: Locator) => Locator | string
+  ): Locator;
+
+  /**
+   * Will create a compound selection that selects elements by grouping multiple locators as anchors
+   * and finding the target elements from their common root parent.
+   *
+   * **Usage example**
+   *
+   * ```js
+   * await page.compoundSelection({
+   *    anchors: (base) => [base.getByText("<selector to first anchor>""), page.locator("selector to second anchor"), "<text content of third anchor>"],
+   *    target?: (base) => base.locator("<relative selector to target element>")
+   * }).first().click();
+   * ```
+   * @param selection
+   */
+  compoundSelection?(selection: {
+    /**
+     * Method that returns array of locators to group and calculate the common parent from.
+     * The method should return an array of locators or strings that point at the anchor elements.
+     *
+     * @param base Base locator that the compound selection is called on.
+     */
+    anchors: (base: Locator) => Array<Locator | string>;
+    /**
+     * Method that returns the relative locator or string content that will point at the target element from the common parent
+     * that was calculated from the anchors.
+     * If the target is null, the compound selection will return a locator to the common parents.
+     *
+     * @param base Base locator that the compound selection is called on.
+     */
+    target?: (base: Locator) => Locator | string;
+  }): Locator;
+}
+
+export interface FrameLocatorOwner {
+  frameLocator: (selector: string) => ChecksumFrameLocator;
+}
+
+export interface ChecksumFrameLocator
+  extends FrameLocator,
+    CompoundSelectionInterface {}
+
+export interface ChecksumLocator
+  extends Omit<Locator, "frameLocator">,
+    CompoundSelectionInterface,
+    FrameLocatorOwner {
   canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
 }
 
@@ -232,7 +291,7 @@ type ChecksumTestType<TestArgs> = TestType<
  *
  * @param base
  */
-export function init(base: ChecksumTestType<PlaywrightTestArgs>): {
+export function init(base?: ChecksumTestType<PlaywrightTestArgs>): {
   test: ChecksumTestType<ChecksumPlaywrightTestArgs>;
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
