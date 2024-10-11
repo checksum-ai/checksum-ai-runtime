@@ -22123,10 +22123,16 @@
       this.start = /* @__PURE__ */ __name(() => {
         this.stopRRWebRecording = record({
           emit: this.eventHandler,
+          // [rrweb config changes]
           sampling: {
             mousemove: false
           },
-          userTriggeredOnInput: true
+          //mousemoveWait: 100,
+          userTriggeredOnInput: true,
+          maskInputOptions: {
+            password: false
+            // Do not mask password inputs
+          }
         });
         if (this.logNativeMutationObserver) {
           this.selfObserve();
@@ -22733,32 +22739,40 @@
       this.rrwebEventsLoaded = false;
       this.loadRRwebEvents = [];
       this.rrwebCrossFrameEventIdCounter = 0;
+      this.firstRequestedIndex = void 0;
     }
     static {
       __name(this, "RrwebEventsStorageManager");
     }
     async initRRwebEvents() {
-      if (this.initialized) {
-        console.warn(
-          "[RrwebEventsStorageManager] initRRwebEvents called more than once"
-        );
-        return;
-      }
-      this.initialized = true;
-      this.rrwebEventsIndexedDB = new IndexedDBClient("checksum", "rrwebEvents");
       try {
-        await this.rrwebEventsIndexedDB.open();
-      } catch (e2) {
-        return;
-      }
-      this.rrwebCrossFrameEventIdCounter = await this.rrwebEventsIndexedDB.count();
-      this.loadRRwebEvents.forEach((event) => {
-        this.rrwebEventsIndexedDB.set(
-          event,
-          this.rrwebCrossFrameEventIdCounter++
+        if (this.initialized) {
+          console.warn(
+            "[RrwebEventsStorageManager] initRRwebEvents called more than once"
+          );
+          return;
+        }
+        this.initialized = true;
+        this.rrwebEventsIndexedDB = new IndexedDBClient(
+          "checksum",
+          "rrwebEvents"
         );
-      });
-      this.rrwebEventsLoaded = true;
+        try {
+          await this.rrwebEventsIndexedDB.open();
+        } catch (e2) {
+          return;
+        }
+        this.rrwebCrossFrameEventIdCounter = await this.rrwebEventsIndexedDB.count();
+        this.loadRRwebEvents.forEach((event) => {
+          this.rrwebEventsIndexedDB.set(
+            event,
+            this.rrwebCrossFrameEventIdCounter++
+          );
+        });
+        this.rrwebEventsLoaded = true;
+      } catch (e2) {
+        console.log(e2);
+      }
     }
     onRRwebEvent(event) {
       if (this.rrwebEventsLoaded) {
@@ -22792,14 +22806,24 @@
         body: JSON.stringify(rrwebEvents)
       });
     }
-    async getRRwebEvents(lowerBoundKey) {
-      if (!this.rrwebEventsLoaded) {
+    async getRRwebEvents(lowerBoundKey, size) {
+      try {
+        if (this.firstRequestedIndex === void 0) {
+          this.firstRequestedIndex = lowerBoundKey;
+        }
+        lowerBoundKey -= this.firstRequestedIndex;
+        if (!this.rrwebEventsLoaded) {
+          return [];
+        }
+        const bound = size ? IDBKeyRange.bound(lowerBoundKey, lowerBoundKey + size) : IDBKeyRange.lowerBound(lowerBoundKey);
+        const events = await this.rrwebEventsIndexedDB.getAll(
+          bound
+        );
+        return events;
+      } catch (e2) {
+        console.log(e2);
         return [];
       }
-      const events = await this.rrwebEventsIndexedDB.getAll(
-        IDBKeyRange.lowerBound(lowerBoundKey)
-      );
-      return events;
     }
     async getRRwebEvent(key) {
       if (!this.rrwebEventsLoaded) {
@@ -24955,6 +24979,116 @@
     }
   };
 
+  // src/lib/test-generator/files-observer.ts
+  var FilesObserver = class {
+    static {
+      __name(this, "FilesObserver");
+    }
+    constructor(sessionMirror) {
+      this.fileInputsWithListeners = /* @__PURE__ */ new Set();
+      this.filesMap = {};
+      this.observer = null;
+      this.sessionMirror = sessionMirror;
+    }
+    // Get files for a specific input by rrwebId
+    async getFilesByRrwebId(rrwebId) {
+      const files = this.filesMap[rrwebId] ?? [];
+      try {
+        const filesAsBase64 = await Promise.all(
+          files.map(async (file) => ({
+            data: await convertFileToBase64(file),
+            fileName: file.name
+          }))
+        );
+        this.filesMap[rrwebId] = [];
+        return filesAsBase64;
+      } catch {
+        console.log("Error while parsing files to base 64");
+      }
+    }
+    // Initialize the observer to track changes in the window
+    init() {
+      console.log("Starting observation...");
+      console.log(this.sessionMirror);
+      this.observeDOMChanges();
+      window.addEventListener("unload", this.cleanup.bind(this));
+    }
+    // Handle the file input change event
+    handleFileChange(event) {
+      console.log("handleFileChange", this.sessionMirror);
+      const target = event.target;
+      const newFiles = Array.from(target.files || []);
+      const rrwebMetaData = this.sessionMirror.getMeta(target);
+      this.filesMap[rrwebMetaData.id] = newFiles;
+      console.log(`Files updated for ID: ${rrwebMetaData.id}`, newFiles);
+    }
+    // Add listeners to file input elements
+    addFileInputListeners(fileInputs) {
+      fileInputs.forEach((input) => {
+        if (!this.fileInputsWithListeners.has(input)) {
+          input.addEventListener("change", this.handleFileChange.bind(this));
+          this.fileInputsWithListeners.add(input);
+        }
+      });
+    }
+    // Observe DOM changes in the window's document
+    observeDOMChanges() {
+      const document2 = window.document;
+      const initialFileInputs = document2.querySelectorAll(
+        'input[type="file"]'
+      );
+      this.addFileInputListeners(initialFileInputs);
+      const onBodyReady = /* @__PURE__ */ __name(() => {
+        this.observer = new MutationObserver((mutationsList) => {
+          mutationsList.forEach((mutation) => {
+            if (mutation.type === "childList") {
+              const fileInputs = mutation.target.querySelectorAll(
+                'input[type="file"]'
+              );
+              this.addFileInputListeners(fileInputs);
+            }
+          });
+        });
+        this.observer.observe(document2.body, { childList: true, subtree: true });
+      }, "onBodyReady");
+      const bodyObserver = new MutationObserver(function() {
+        if (document2.body) {
+          bodyObserver.disconnect();
+          onBodyReady();
+        }
+      });
+      bodyObserver.observe(document2.documentElement, { childList: true });
+    }
+    // Cleanup the observer and remove event listeners
+    cleanup() {
+      console.log("Cleaning up files observer...");
+      if (this.observer) {
+        this.observer.disconnect();
+      }
+      this.fileInputsWithListeners.forEach((input) => {
+        input.removeEventListener("change", this.handleFileChange);
+      });
+      this.fileInputsWithListeners.clear();
+      this.filesMap = {};
+    }
+  };
+  var convertFileToBase64 = /* @__PURE__ */ __name((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          resolve(reader.result.toString());
+        } else {
+          reject(new Error("File reading failed"));
+        }
+      };
+      reader.onerror = () => {
+        reject(new Error("File reading failed"));
+      };
+      reader.readAsDataURL(file);
+    });
+  }, "convertFileToBase64");
+
   // src/lib/test-generator/test-generator.ts
   var LOGS_PREFIX = "$checksum";
   var ChecksumTestGenerator = class {
@@ -25066,7 +25200,8 @@
     }
     // -------- [API] -------- //
     init(appSpecificRules, config = {}, {
-      sessionRecorder: initSessionRecorder = true
+      sessionRecorder: initSessionRecorder = true,
+      filesObserver: initFilesObserver = false
     } = {}, options = {}) {
       this.appSpecificRules = appSpecificRules;
       this.config = config;
@@ -25078,9 +25213,19 @@
       }
       if (initSessionRecorder) {
         this.sessionMirror = new SessionRecorder((event) => {
+          console.log("send events");
+          window.checksumSendMessage?.("vtg", { type: "event", data: event });
+          try {
+            window["onRrwebEvents"]?.([event]);
+          } catch (e2) {
+          }
           rrwebEventsStorageManager.onRRwebEvent(event);
         });
         rrwebEventsStorageManager.initRRwebEvents();
+      }
+      if (initFilesObserver) {
+        this.filesObserver = new FilesObserver(this.sessionMirror);
+        this.filesObserver.init();
       }
       if (this.sessionMirror) {
         this.sessionMirror.start();
@@ -25904,8 +26049,13 @@
       super.setEventHandlers(eventHandlers);
     }
     async handleEvents(events, len) {
-      console.log("starting handleEvents", len);
       try {
+        events = events.filter(
+          (event) => event.timestamp >= (this.lastSeenTimestamp ? this.lastSeenTimestamp : 0)
+        );
+        if (events.length) {
+          this.lastSeenTimestamp = events[events.length - 1].timestamp;
+        }
         for (const event of events) {
           await this.eventProcessor.processEvent(event, this.shouldHandleEvents);
           await this.skipEvents([event]);
@@ -26138,6 +26288,7 @@
     constructor() {
       super();
       this.events = [];
+      this.previousEvent = null;
       this.interactions = [];
       this.lastInteractionEventIndex = 0;
       this.sequences = [];
@@ -26186,7 +26337,9 @@
           if (!draggableNode) {
             return;
           }
-          const draggableSelector = await this.elementSelector.getSelector(draggableNode);
+          const draggableSelector = await this.elementSelector.getSelector(
+            draggableNode
+          );
           if (!draggableSelector) {
             return;
           }
@@ -26196,7 +26349,9 @@
           if (!dropzoneNode) {
             return;
           }
-          const dropzoneSelector = await this.elementSelector.getSelector(dropzoneNode);
+          const dropzoneSelector = await this.elementSelector.getSelector(
+            dropzoneNode
+          );
           if (!dropzoneSelector) {
             return;
           }
@@ -26247,6 +26402,7 @@
       this.events.push(event);
     }
     async postEvent(event, result) {
+      this.previousEvent = event;
       try {
         await this.performSequenceSearch();
       } catch (e2) {
@@ -26276,7 +26432,9 @@
         event,
         selector
       );
+      action.rrwebId = data.id;
       if (action.eventCode === "input" /* Input */) {
+        action.timestamp = this.previousEvent?.timestamp ?? event.timestamp;
         action.fillValue = data.text;
         this.inputFilter = {
           action,
@@ -26288,7 +26446,7 @@
       }
       if (action.eventCode === "upload_files" /* UploadFiles */) {
         action.files = [];
-        action.files.push(data.text);
+        action.files.push(data.text.split("\\").pop());
       }
       this.addInteraction(action);
     }
@@ -26421,6 +26579,9 @@
       }
     }
     addInteraction(action) {
+      if (!action.id) {
+        action.id = Date.now().toString();
+      }
       this.interactions.push(action);
       this.lastInteractionEventIndex = this.events.length;
     }
@@ -26485,6 +26646,9 @@
       this.singleSelection = true;
       this.subDocumentInspector = null;
       this.listening = false;
+      this.onMouseOut = /* @__PURE__ */ __name((event) => {
+        elementHighlighter.clearHighlights();
+      }, "onMouseOut");
       this.onMouseOver = /* @__PURE__ */ __name(async (event) => {
         const target = event.composedPath()[0];
         if ("getRootNode" in target) {
@@ -26556,6 +26720,13 @@
         if (this.singleSelection) {
           this.topLevelInspector ? this.topLevelInspector.stop() : this.stop();
         }
+        window.parent.postMessage(
+          {
+            type: "inspector-selection",
+            data: this.selected.at(this.selected.length - 1)
+          },
+          "*"
+        );
         console.log("selected", this.selected);
       }, "onClick");
       this.handleSubDocument = /* @__PURE__ */ __name((newRootDocument, defaultView) => {
@@ -26592,6 +26763,7 @@
       this.stop();
       this.cleanSelection();
       this.rootDocument.addEventListener("mouseover", this.onMouseOver);
+      this.rootDocument.addEventListener("mouseout", this.onMouseOut);
       this.listening = true;
     }
     stop(clean = false) {
@@ -26641,14 +26813,18 @@
     static {
       __name(this, "VisualTestGenerator");
     }
-    init(shouldHandleEvents = true) {
-      this.timeMachine.setEventHandlers(this.eventHandlers, shouldHandleEvents);
+    init() {
+      this.timeMachine.setEventHandlers(this.eventHandlers, true);
     }
     consumeInteractions() {
       const interactions = this.eventHandlers.getInteractions(
         this.lengthOfConsumedInteractions
       );
       this.lengthOfConsumedInteractions += interactions.length;
+      window.checksumSendMessage("vtg", {
+        type: "consume-interactions",
+        data: interactions
+      });
       return interactions;
     }
     startInspector(singleSelection = true, rootDocument) {
@@ -26661,7 +26837,7 @@
       return document.querySelector(".replayer-wrapper > iframe").contentDocument;
     }
     stopInspector() {
-      this.elementInspector.stop();
+      this.elementInspector?.stop();
     }
     consumeSelections() {
       return this.elementInspector.consumeSelections();
