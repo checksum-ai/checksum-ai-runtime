@@ -64,10 +64,10 @@ export interface CompoundSelectionInterface {
    *               that was calculated from the anchors.
    *               If no target is provided, the compound selection will return a locator to the common parents.
    */
-  compoundSelection?(
+  compoundSelection(
     anchors: (base: Locator) => Array<Locator | string>,
     target?: (base: Locator) => Locator | string
-  ): Locator;
+  ): Locator[];
 
   /**
    * Will create a compound selection that selects elements by grouping multiple locators as anchors
@@ -83,7 +83,7 @@ export interface CompoundSelectionInterface {
    * ```
    * @param selection
    */
-  compoundSelection?(selection: {
+  compoundSelection(selection: {
     /**
      * Method that returns array of locators to group and calculate the common parent from.
      * The method should return an array of locators or strings that point at the anchor elements.
@@ -99,7 +99,7 @@ export interface CompoundSelectionInterface {
      * @param base Base locator that the compound selection is called on.
      */
     target?: (base: Locator) => Locator | string;
-  }): Locator;
+  }): Locator[];
 }
 
 export interface FrameLocatorOwner {
