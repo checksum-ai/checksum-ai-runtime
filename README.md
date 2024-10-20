@@ -2,7 +2,7 @@
 
 ### Quick Start
 
-1. Install the package using `npm install -D @checksum-ai/runtime` or `yarn add @checksum-ai/runtime -D`.
+1. Install the package using `npm install -D checksumai` or `yarn add checksumai -D`.
 2. Navigate to the directory where you want to initialize the Checksum tests folder and run `npx checksumai init`.
 3. In the newly created "checksum" folder
    1. Edit `checksum.config.ts` and add the necessary configurations, including your apiKey, application baseURL, environment info, etc.
