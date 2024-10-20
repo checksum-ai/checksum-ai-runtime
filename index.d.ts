@@ -8,6 +8,7 @@ import {
   PlaywrightWorkerOptions,
   Locator,
   FrameLocator,
+  Dialog,
 } from "@playwright/test";
 
 interface ChecksumAIMethod {
@@ -32,6 +33,7 @@ export interface IChecksumPage
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
   reauthenticate: (role: string) => Promise<void>;
+  waitForDialog: (timeout?: number) => Promise<Dialog>;
   locator(
     selector: string,
     options?: {
@@ -286,6 +288,10 @@ type ChecksumTestType<TestArgs> = TestType<
   PlaywrightWorkerArgs & PlaywrightWorkerOptions
 >;
 
+export type ChecksumAI = {
+  (description: string, testFunction: Function): Promise<any>;
+  withDialog: ChecksumAI;
+};
 /**
  * Initialize Checksum runtime
  *
@@ -296,7 +302,7 @@ export function init(base?: ChecksumTestType<PlaywrightTestArgs>): {
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
   expect: IChecksumExpect;
-  checksumAI: (description: string, testFunction: Function) => Promise<any>;
+  checksumAI: ChecksumAI; 
   getEnvironment: ({
     name,
     userRole,
