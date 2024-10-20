@@ -2,7 +2,7 @@
 
 ### Quick Start
 
-1. Install the package using `npm install -D @checksum-ai/runtime` or `yarn add @checksum-ai/runtime -D`.
+1. Install the package using `npm install -D checksumai` or `yarn add checksumai -D`.
 2. Navigate to the directory where you want to initialize the Checksum tests folder and run `npx checksumai init`.
 3. In the newly created "checksum" folder
    1. Edit `checksum.config.ts` and add the necessary configurations, including your apiKey, application baseURL, environment info, etc.
@@ -239,6 +239,8 @@ interface ChecksumPage extends Page {
 ## ChecksumLocator API
 
 ChecksumLocator extends the existing Playwright Locator, adding the following functionality:
+* canvasClick
+* compoundSelection
 
 ```js
 interface ChecksumLocator extends Locator {
@@ -250,6 +252,61 @@ interface ChecksumLocator extends Locator {
    * await page.locator('canvas').canvasClick('graph-point-1', 1); // clicking on the 2nd largest
    */
   canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
+
+  /**
+   * Resolves to an array of locators for the given target element based on existance of the given anchors sharing the minimal common parent
+   *
+   * **Usage example**
+   *
+   * ```js
+   * await page.compoundSelection(
+   *  (base) => [base.getByText("<selector to first anchor>""), page.locator("selector to second anchor"), "<text content of third anchor>"],
+   *  (base) => base.locator("<relative selector to target element>")
+   * ]).first().click();
+   * ```
+   *
+   * @param anchors Method that returns array of locators to group and calculate the common parent from.
+   *                The method receives the base locator as an argument, which is the locator that the compound selection is called on.
+   *                The method should return an array of locators or strings that point at the anchor elements.
+   * @param target [optional] Method that returns the relative locator or string content that will point at the target element from the common parent
+   *               that was calculated from the anchors.
+   *               If no target is provided, the compound selection will return a locator to the common parents.
+   */
+  compoundSelection(
+    anchors: (base: Locator) => Array<Locator | string>,
+    target?: (base: Locator) => Locator | string
+  ): ChecksumLocator[];
+
+  /**
+   * Resolves to an array of locators for the given target element based on existance of the given anchors sharing the minimal common parent
+   *
+   * **Usage example**
+   *
+   * ```js
+   * await page.compoundSelection({
+   *    anchors: (base) => [base.getByText("<selector to first anchor>""), page.locator("selector to second anchor"), "<text content of third anchor>"],
+   *    target?: (base) => base.locator("<relative selector to target element>")
+   * }).first().click();
+   * ```
+   * @param selection
+   */
+  compoundSelection(selection: {
+    /**
+     * Method that returns array of locators to group and calculate the common parent from.
+     * The method should return an array of locators or strings that point at the anchor elements.
+     *
+     * @param base Base locator that the compound selection is called on.
+     */
+    anchors: (base: Locator) => Array<Locator | string>;
+    /**
+     * Method that returns the relative locator or string content that will point at the target element from the common parent
+     * that was calculated from the anchors.
+     * If the target is null, the compound selection will return a locator to the common parents.
+     *
+     * @param base Base locator that the compound selection is called on.
+     */
+    target?: (base: Locator) => Locator | string;
+  }): ChecksumLocator[];
 }
 ```
 
