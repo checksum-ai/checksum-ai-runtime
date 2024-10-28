@@ -8,6 +8,7 @@ import {
   PlaywrightWorkerOptions,
   Locator,
   FrameLocator,
+  Dialog,
 } from "@playwright/test";
 
 interface ChecksumAIMethod {
@@ -17,13 +18,18 @@ interface ChecksumAIMethod {
 
 type EnumValues<T> = T[keyof T];
 
-export interface CompoundSelectorLocatorInterface extends PWLocators {}
 export interface IVariablesStore {
   [key: string]: any;
 }
 
+type ModifyLocatorMethodToChecksumLocator<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => Locator // Check if the property is a function returning Locator
+    ? (...args: Parameters<T[K]>) => ChecksumLocator // Change its return type to ChecksumLocator
+    : T[K]; // Keep the rest of the fields as they are
+};
+
 export interface IChecksumPage
-  extends Omit<Page, "frameLocator">,
+  extends Omit<ModifyLocatorMethodToChecksumLocator<Page>, "frameLocator">,
     CompoundSelectionInterface,
     FrameLocatorOwner {
   checksumSelector: (id: string) => IChecksumPage;
@@ -32,21 +38,14 @@ export interface IChecksumPage
   resolveAssetsFolder: (assets: string[]) => string[];
   getPage(index: number): Promise<IChecksumPage>;
   reauthenticate: (role: string) => Promise<void>;
-  locator(
-    selector: string,
-    options?: {
-      has?: Locator;
-      hasNot?: Locator;
-      hasNotText?: string | RegExp;
-      hasText?: string | RegExp;
-    }
-  ): ChecksumLocator;
+  waitForDialog: (timeout?: number) => Promise<Dialog>;
 }
 
 export interface CompoundSelectionInterface {
   /**
    * Will create a compound selection that selects elements by grouping multiple locators as anchors
-   * and finding the target elements from their common root parent
+   * and finding the target elements, if specified, from their common root parent.
+   * If no target is provided, the compound selection will return a locator to the common parents that were calculated from the anchors.
    *
    * **Usage example**
    *
@@ -57,21 +56,23 @@ export interface CompoundSelectionInterface {
    * ]).first().click();
    * ```
    *
-   * @param anchors Method that returns array of locators to group and calculate the common parent from.
-   *                The method receives the base locator as an argument, which is the locator that the compound selection is called on.
+   * @param anchors Method that returns array of locators and/or text context, to group and calculate the common parent from.
+   *                The method receives the base locator as an argument, which is the relative locator or page that the compound selection is called on.
    *                The method should return an array of locators or strings that point at the anchor elements.
    * @param target [optional] Method that returns the relative locator or string content that will point at the target element from the common parent
    *               that was calculated from the anchors.
-   *               If no target is provided, the compound selection will return a locator to the common parents.
+   *               If no target is provided, the compound selection will return a locator pointing at the common parents.
+   * @returns Locator to the common parent(s) or the target element(s) if specified.
    */
   compoundSelection(
     anchors: (base: Locator) => Array<Locator | string>,
     target?: (base: Locator) => Locator | string
-  ): Locator[];
+  ): ChecksumLocator;
 
   /**
    * Will create a compound selection that selects elements by grouping multiple locators as anchors
-   * and finding the target elements from their common root parent.
+   * and finding the target elements, if specified, from their common root parent.
+   * If no target is provided, the compound selection will return a locator to the common parents that were calculated from the anchors.
    *
    * **Usage example**
    *
@@ -82,10 +83,12 @@ export interface CompoundSelectionInterface {
    * }).first().click();
    * ```
    * @param selection
+   * @returns Locator to the common parent(s) or the target element(s) if specified.
    */
   compoundSelection(selection: {
     /**
-     * Method that returns array of locators to group and calculate the common parent from.
+     * Method that returns array of locators and/or text context, to group and calculate the common parent from.
+     * The method receives the base locator as an argument, which is the relative locator or page that the compound selection is called on.
      * The method should return an array of locators or strings that point at the anchor elements.
      *
      * @param base Base locator that the compound selection is called on.
@@ -94,12 +97,12 @@ export interface CompoundSelectionInterface {
     /**
      * Method that returns the relative locator or string content that will point at the target element from the common parent
      * that was calculated from the anchors.
-     * If the target is null, the compound selection will return a locator to the common parents.
+     * If the target is null, the compound selection will return a locator pointing at the common parents.
      *
      * @param base Base locator that the compound selection is called on.
      */
     target?: (base: Locator) => Locator | string;
-  }): Locator[];
+  }): ChecksumLocator;
 }
 
 export interface FrameLocatorOwner {
@@ -111,7 +114,7 @@ export interface ChecksumFrameLocator
     CompoundSelectionInterface {}
 
 export interface ChecksumLocator
-  extends Omit<Locator, "frameLocator">,
+  extends Omit<ModifyLocatorMethodToChecksumLocator<Locator>, "frameLocator">,
     CompoundSelectionInterface,
     FrameLocatorOwner {
   canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
@@ -286,6 +289,10 @@ type ChecksumTestType<TestArgs> = TestType<
   PlaywrightWorkerArgs & PlaywrightWorkerOptions
 >;
 
+export type ChecksumAI = {
+  (description: string, testFunction: Function): Promise<any>;
+  withDialog: ChecksumAI;
+};
 /**
  * Initialize Checksum runtime
  *
@@ -296,7 +303,7 @@ export function init(base?: ChecksumTestType<PlaywrightTestArgs>): {
   login: ReturnType<typeof getLogin>;
   defineChecksumTest: (title: string, testId: string) => string;
   expect: IChecksumExpect;
-  checksumAI: (description: string, testFunction: Function) => Promise<any>;
+  checksumAI: ChecksumAI;
   getEnvironment: ({
     name,
     userRole,
@@ -322,4 +329,4 @@ export enum Locators {
   FrameLocator = "frameLocator",
 }
 
-export type PWLocators = Pick<Locator, EnumValues<typeof Locators>>;
+// export type PWLocators = Pick<Locator, EnumValues<typeof Locators>>;

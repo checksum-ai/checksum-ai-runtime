@@ -222,6 +222,20 @@ interface ChecksumPage extends Page {
    * When required to login mid-test, use reauthenticate with the user's role. Note: It is not possible to change environments during a single test run.
    */
   reauthenticate: (role: string) => Promise<void>;
+
+   /**
+   * When required to handle actions that involve browser Native Dialogs that are part of the WebAPI,
+   * use waitForDialog to listen for any dialog events, and handle them accordingly inside the handler.
+   * Note: waitForDialog can only work within a checksumAI.withDialog call which initiates the dialog listener. 
+   * 
+   * await checksumAI.withDialog("delete item and confirm", () => {
+   *  await page.locator('.delete').click();
+   *  await page.waitForDialog().then((confirm) => {
+   *      confirm.accept();
+   *  });
+   * });
+   */
+  waitForDialog: (timeout?: number) => Promise<Dialog>;
 }
 
 ```
