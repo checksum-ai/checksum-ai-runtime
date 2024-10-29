@@ -6765,6 +6765,483 @@
     }
   });
 
+  // ../../node_modules/mousetrap/mousetrap.js
+  var require_mousetrap = __commonJS({
+    "../../node_modules/mousetrap/mousetrap.js"(exports, module) {
+      (function(window2, document2, undefined2) {
+        if (!window2) {
+          return;
+        }
+        var _MAP = {
+          8: "backspace",
+          9: "tab",
+          13: "enter",
+          16: "shift",
+          17: "ctrl",
+          18: "alt",
+          20: "capslock",
+          27: "esc",
+          32: "space",
+          33: "pageup",
+          34: "pagedown",
+          35: "end",
+          36: "home",
+          37: "left",
+          38: "up",
+          39: "right",
+          40: "down",
+          45: "ins",
+          46: "del",
+          91: "meta",
+          93: "meta",
+          224: "meta"
+        };
+        var _KEYCODE_MAP = {
+          106: "*",
+          107: "+",
+          109: "-",
+          110: ".",
+          111: "/",
+          186: ";",
+          187: "=",
+          188: ",",
+          189: "-",
+          190: ".",
+          191: "/",
+          192: "`",
+          219: "[",
+          220: "\\",
+          221: "]",
+          222: "'"
+        };
+        var _SHIFT_MAP = {
+          "~": "`",
+          "!": "1",
+          "@": "2",
+          "#": "3",
+          "$": "4",
+          "%": "5",
+          "^": "6",
+          "&": "7",
+          "*": "8",
+          "(": "9",
+          ")": "0",
+          "_": "-",
+          "+": "=",
+          ":": ";",
+          '"': "'",
+          "<": ",",
+          ">": ".",
+          "?": "/",
+          "|": "\\"
+        };
+        var _SPECIAL_ALIASES = {
+          "option": "alt",
+          "command": "meta",
+          "return": "enter",
+          "escape": "esc",
+          "plus": "+",
+          "mod": /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "meta" : "ctrl"
+        };
+        var _REVERSE_MAP;
+        for (var i2 = 1; i2 < 20; ++i2) {
+          _MAP[111 + i2] = "f" + i2;
+        }
+        for (i2 = 0; i2 <= 9; ++i2) {
+          _MAP[i2 + 96] = i2.toString();
+        }
+        function _addEvent(object, type, callback) {
+          if (object.addEventListener) {
+            object.addEventListener(type, callback, false);
+            return;
+          }
+          object.attachEvent("on" + type, callback);
+        }
+        __name(_addEvent, "_addEvent");
+        function _characterFromEvent(e2) {
+          if (e2.type == "keypress") {
+            var character = String.fromCharCode(e2.which);
+            if (!e2.shiftKey) {
+              character = character.toLowerCase();
+            }
+            return character;
+          }
+          if (_MAP[e2.which]) {
+            return _MAP[e2.which];
+          }
+          if (_KEYCODE_MAP[e2.which]) {
+            return _KEYCODE_MAP[e2.which];
+          }
+          return String.fromCharCode(e2.which).toLowerCase();
+        }
+        __name(_characterFromEvent, "_characterFromEvent");
+        function _modifiersMatch(modifiers1, modifiers2) {
+          return modifiers1.sort().join(",") === modifiers2.sort().join(",");
+        }
+        __name(_modifiersMatch, "_modifiersMatch");
+        function _eventModifiers(e2) {
+          var modifiers = [];
+          if (e2.shiftKey) {
+            modifiers.push("shift");
+          }
+          if (e2.altKey) {
+            modifiers.push("alt");
+          }
+          if (e2.ctrlKey) {
+            modifiers.push("ctrl");
+          }
+          if (e2.metaKey) {
+            modifiers.push("meta");
+          }
+          return modifiers;
+        }
+        __name(_eventModifiers, "_eventModifiers");
+        function _preventDefault(e2) {
+          if (e2.preventDefault) {
+            e2.preventDefault();
+            return;
+          }
+          e2.returnValue = false;
+        }
+        __name(_preventDefault, "_preventDefault");
+        function _stopPropagation(e2) {
+          if (e2.stopPropagation) {
+            e2.stopPropagation();
+            return;
+          }
+          e2.cancelBubble = true;
+        }
+        __name(_stopPropagation, "_stopPropagation");
+        function _isModifier(key) {
+          return key == "shift" || key == "ctrl" || key == "alt" || key == "meta";
+        }
+        __name(_isModifier, "_isModifier");
+        function _getReverseMap() {
+          if (!_REVERSE_MAP) {
+            _REVERSE_MAP = {};
+            for (var key in _MAP) {
+              if (key > 95 && key < 112) {
+                continue;
+              }
+              if (_MAP.hasOwnProperty(key)) {
+                _REVERSE_MAP[_MAP[key]] = key;
+              }
+            }
+          }
+          return _REVERSE_MAP;
+        }
+        __name(_getReverseMap, "_getReverseMap");
+        function _pickBestAction(key, modifiers, action) {
+          if (!action) {
+            action = _getReverseMap()[key] ? "keydown" : "keypress";
+          }
+          if (action == "keypress" && modifiers.length) {
+            action = "keydown";
+          }
+          return action;
+        }
+        __name(_pickBestAction, "_pickBestAction");
+        function _keysFromString(combination) {
+          if (combination === "+") {
+            return ["+"];
+          }
+          combination = combination.replace(/\+{2}/g, "+plus");
+          return combination.split("+");
+        }
+        __name(_keysFromString, "_keysFromString");
+        function _getKeyInfo(combination, action) {
+          var keys;
+          var key;
+          var i3;
+          var modifiers = [];
+          keys = _keysFromString(combination);
+          for (i3 = 0; i3 < keys.length; ++i3) {
+            key = keys[i3];
+            if (_SPECIAL_ALIASES[key]) {
+              key = _SPECIAL_ALIASES[key];
+            }
+            if (action && action != "keypress" && _SHIFT_MAP[key]) {
+              key = _SHIFT_MAP[key];
+              modifiers.push("shift");
+            }
+            if (_isModifier(key)) {
+              modifiers.push(key);
+            }
+          }
+          action = _pickBestAction(key, modifiers, action);
+          return {
+            key,
+            modifiers,
+            action
+          };
+        }
+        __name(_getKeyInfo, "_getKeyInfo");
+        function _belongsTo(element, ancestor) {
+          if (element === null || element === document2) {
+            return false;
+          }
+          if (element === ancestor) {
+            return true;
+          }
+          return _belongsTo(element.parentNode, ancestor);
+        }
+        __name(_belongsTo, "_belongsTo");
+        function Mousetrap2(targetElement) {
+          var self2 = this;
+          targetElement = targetElement || document2;
+          if (!(self2 instanceof Mousetrap2)) {
+            return new Mousetrap2(targetElement);
+          }
+          self2.target = targetElement;
+          self2._callbacks = {};
+          self2._directMap = {};
+          var _sequenceLevels = {};
+          var _resetTimer;
+          var _ignoreNextKeyup = false;
+          var _ignoreNextKeypress = false;
+          var _nextExpectedAction = false;
+          function _resetSequences(doNotReset) {
+            doNotReset = doNotReset || {};
+            var activeSequences = false, key;
+            for (key in _sequenceLevels) {
+              if (doNotReset[key]) {
+                activeSequences = true;
+                continue;
+              }
+              _sequenceLevels[key] = 0;
+            }
+            if (!activeSequences) {
+              _nextExpectedAction = false;
+            }
+          }
+          __name(_resetSequences, "_resetSequences");
+          function _getMatches(character, modifiers, e2, sequenceName, combination, level) {
+            var i3;
+            var callback;
+            var matches = [];
+            var action = e2.type;
+            if (!self2._callbacks[character]) {
+              return [];
+            }
+            if (action == "keyup" && _isModifier(character)) {
+              modifiers = [character];
+            }
+            for (i3 = 0; i3 < self2._callbacks[character].length; ++i3) {
+              callback = self2._callbacks[character][i3];
+              if (!sequenceName && callback.seq && _sequenceLevels[callback.seq] != callback.level) {
+                continue;
+              }
+              if (action != callback.action) {
+                continue;
+              }
+              if (action == "keypress" && !e2.metaKey && !e2.ctrlKey || _modifiersMatch(modifiers, callback.modifiers)) {
+                var deleteCombo = !sequenceName && callback.combo == combination;
+                var deleteSequence = sequenceName && callback.seq == sequenceName && callback.level == level;
+                if (deleteCombo || deleteSequence) {
+                  self2._callbacks[character].splice(i3, 1);
+                }
+                matches.push(callback);
+              }
+            }
+            return matches;
+          }
+          __name(_getMatches, "_getMatches");
+          function _fireCallback(callback, e2, combo, sequence) {
+            if (self2.stopCallback(e2, e2.target || e2.srcElement, combo, sequence)) {
+              return;
+            }
+            if (callback(e2, combo) === false) {
+              _preventDefault(e2);
+              _stopPropagation(e2);
+            }
+          }
+          __name(_fireCallback, "_fireCallback");
+          self2._handleKey = function(character, modifiers, e2) {
+            var callbacks = _getMatches(character, modifiers, e2);
+            var i3;
+            var doNotReset = {};
+            var maxLevel = 0;
+            var processedSequenceCallback = false;
+            for (i3 = 0; i3 < callbacks.length; ++i3) {
+              if (callbacks[i3].seq) {
+                maxLevel = Math.max(maxLevel, callbacks[i3].level);
+              }
+            }
+            for (i3 = 0; i3 < callbacks.length; ++i3) {
+              if (callbacks[i3].seq) {
+                if (callbacks[i3].level != maxLevel) {
+                  continue;
+                }
+                processedSequenceCallback = true;
+                doNotReset[callbacks[i3].seq] = 1;
+                _fireCallback(callbacks[i3].callback, e2, callbacks[i3].combo, callbacks[i3].seq);
+                continue;
+              }
+              if (!processedSequenceCallback) {
+                _fireCallback(callbacks[i3].callback, e2, callbacks[i3].combo);
+              }
+            }
+            var ignoreThisKeypress = e2.type == "keypress" && _ignoreNextKeypress;
+            if (e2.type == _nextExpectedAction && !_isModifier(character) && !ignoreThisKeypress) {
+              _resetSequences(doNotReset);
+            }
+            _ignoreNextKeypress = processedSequenceCallback && e2.type == "keydown";
+          };
+          function _handleKeyEvent(e2) {
+            if (typeof e2.which !== "number") {
+              e2.which = e2.keyCode;
+            }
+            var character = _characterFromEvent(e2);
+            if (!character) {
+              return;
+            }
+            if (e2.type == "keyup" && _ignoreNextKeyup === character) {
+              _ignoreNextKeyup = false;
+              return;
+            }
+            self2.handleKey(character, _eventModifiers(e2), e2);
+          }
+          __name(_handleKeyEvent, "_handleKeyEvent");
+          function _resetSequenceTimer() {
+            clearTimeout(_resetTimer);
+            _resetTimer = setTimeout(_resetSequences, 1e3);
+          }
+          __name(_resetSequenceTimer, "_resetSequenceTimer");
+          function _bindSequence(combo, keys, callback, action) {
+            _sequenceLevels[combo] = 0;
+            function _increaseSequence(nextAction) {
+              return function() {
+                _nextExpectedAction = nextAction;
+                ++_sequenceLevels[combo];
+                _resetSequenceTimer();
+              };
+            }
+            __name(_increaseSequence, "_increaseSequence");
+            function _callbackAndReset(e2) {
+              _fireCallback(callback, e2, combo);
+              if (action !== "keyup") {
+                _ignoreNextKeyup = _characterFromEvent(e2);
+              }
+              setTimeout(_resetSequences, 10);
+            }
+            __name(_callbackAndReset, "_callbackAndReset");
+            for (var i3 = 0; i3 < keys.length; ++i3) {
+              var isFinal = i3 + 1 === keys.length;
+              var wrappedCallback = isFinal ? _callbackAndReset : _increaseSequence(action || _getKeyInfo(keys[i3 + 1]).action);
+              _bindSingle(keys[i3], wrappedCallback, action, combo, i3);
+            }
+          }
+          __name(_bindSequence, "_bindSequence");
+          function _bindSingle(combination, callback, action, sequenceName, level) {
+            self2._directMap[combination + ":" + action] = callback;
+            combination = combination.replace(/\s+/g, " ");
+            var sequence = combination.split(" ");
+            var info;
+            if (sequence.length > 1) {
+              _bindSequence(combination, sequence, callback, action);
+              return;
+            }
+            info = _getKeyInfo(combination, action);
+            self2._callbacks[info.key] = self2._callbacks[info.key] || [];
+            _getMatches(info.key, info.modifiers, { type: info.action }, sequenceName, combination, level);
+            self2._callbacks[info.key][sequenceName ? "unshift" : "push"]({
+              callback,
+              modifiers: info.modifiers,
+              action: info.action,
+              seq: sequenceName,
+              level,
+              combo: combination
+            });
+          }
+          __name(_bindSingle, "_bindSingle");
+          self2._bindMultiple = function(combinations, callback, action) {
+            for (var i3 = 0; i3 < combinations.length; ++i3) {
+              _bindSingle(combinations[i3], callback, action);
+            }
+          };
+          _addEvent(targetElement, "keypress", _handleKeyEvent);
+          _addEvent(targetElement, "keydown", _handleKeyEvent);
+          _addEvent(targetElement, "keyup", _handleKeyEvent);
+        }
+        __name(Mousetrap2, "Mousetrap");
+        Mousetrap2.prototype.bind = function(keys, callback, action) {
+          var self2 = this;
+          keys = keys instanceof Array ? keys : [keys];
+          self2._bindMultiple.call(self2, keys, callback, action);
+          return self2;
+        };
+        Mousetrap2.prototype.unbind = function(keys, action) {
+          var self2 = this;
+          return self2.bind.call(self2, keys, function() {
+          }, action);
+        };
+        Mousetrap2.prototype.trigger = function(keys, action) {
+          var self2 = this;
+          if (self2._directMap[keys + ":" + action]) {
+            self2._directMap[keys + ":" + action]({}, keys);
+          }
+          return self2;
+        };
+        Mousetrap2.prototype.reset = function() {
+          var self2 = this;
+          self2._callbacks = {};
+          self2._directMap = {};
+          return self2;
+        };
+        Mousetrap2.prototype.stopCallback = function(e2, element) {
+          var self2 = this;
+          if ((" " + element.className + " ").indexOf(" mousetrap ") > -1) {
+            return false;
+          }
+          if (_belongsTo(element, self2.target)) {
+            return false;
+          }
+          if ("composedPath" in e2 && typeof e2.composedPath === "function") {
+            var initialEventTarget = e2.composedPath()[0];
+            if (initialEventTarget !== e2.target) {
+              element = initialEventTarget;
+            }
+          }
+          return element.tagName == "INPUT" || element.tagName == "SELECT" || element.tagName == "TEXTAREA" || element.isContentEditable;
+        };
+        Mousetrap2.prototype.handleKey = function() {
+          var self2 = this;
+          return self2._handleKey.apply(self2, arguments);
+        };
+        Mousetrap2.addKeycodes = function(object) {
+          for (var key in object) {
+            if (object.hasOwnProperty(key)) {
+              _MAP[key] = object[key];
+            }
+          }
+          _REVERSE_MAP = null;
+        };
+        Mousetrap2.init = function() {
+          var documentMousetrap = Mousetrap2(document2);
+          for (var method in documentMousetrap) {
+            if (method.charAt(0) !== "_") {
+              Mousetrap2[method] = /* @__PURE__ */ function(method2) {
+                return function() {
+                  return documentMousetrap[method2].apply(documentMousetrap, arguments);
+                };
+              }(method);
+            }
+          }
+        };
+        Mousetrap2.init();
+        window2.Mousetrap = Mousetrap2;
+        if (typeof module !== "undefined" && module.exports) {
+          module.exports = Mousetrap2;
+        }
+        if (typeof define === "function" && define.amd) {
+          define(function() {
+            return Mousetrap2;
+          });
+        }
+      })(typeof window !== "undefined" ? window : null, typeof window !== "undefined" ? document : null);
+    }
+  });
+
   // ../js-lib/src/esra/config.ts
   var ESRAConfig = {
     examinedAttributes: [
@@ -28379,6 +28856,8 @@
     }
     handleNativeDialog(data, event) {
     }
+    handleRecordAssertion(data, event) {
+    }
   };
 
   // src/lib/session-digester/session-digester-event-handlers.ts
@@ -28786,6 +29265,10 @@
   // ../browser-lib/src/session-record-replay/event-processor.ts
   var EventProcessor = class {
     constructor({ eventHandlers }) {
+      this.filter = {
+        only: [],
+        exclude: []
+      };
       this.preCastEvent = /* @__PURE__ */ __name(async (event) => {
         return this.handlers.preCastEvent(event);
       }, "preCastEvent");
@@ -28798,6 +29281,34 @@
       this.skipEvents = /* @__PURE__ */ __name(async (events) => {
         return this.handlers.skipEvents(events);
       }, "skipEvents");
+      this.shouldProcess = /* @__PURE__ */ __name((event) => {
+        const { only, exclude } = this.filter;
+        const matchFilter = /* @__PURE__ */ __name((filter) => {
+          if (
+            // Filter events are always processed
+            event.type === EventType.Custom && event.data.tag === "filter" /* Filter */
+          ) {
+            return true;
+          }
+          if (filter.type !== event.type) {
+            return false;
+          }
+          if (event.type === EventType.Custom) {
+            return filter.tag === event.data.tag;
+          }
+          if (event.type === EventType.IncrementalSnapshot) {
+            return event.data.source === filter.source;
+          }
+          return true;
+        }, "matchFilter");
+        if (only.length > 0 && !only.some(matchFilter)) {
+          return false;
+        }
+        if (exclude.length > 0 && exclude.some(matchFilter)) {
+          return false;
+        }
+        return true;
+      }, "shouldProcess");
       this.handlers = eventHandlers;
     }
     static {
@@ -28807,6 +29318,9 @@
       this.handlers = eventHandlers;
     }
     async handleEvent(event) {
+      if (!this.shouldProcess(event)) {
+        return;
+      }
       switch (event.type) {
         case EventType.Meta:
           return this.handlers.handleMeta(event.data, event);
@@ -28839,6 +29353,13 @@
               return this.handlers.handleURLChange(event.data.payload, event);
             case "native-dialog-event" /* NativeDialogEvent */:
               return this.handlers.handleNativeDialog(event.data.payload, event);
+            case "assertion" /* Assertion */:
+              return this.handlers.handleRecordAssertion(
+                event.data.payload,
+                event
+              );
+            case "filter" /* Filter */:
+              this.handleFilterEvent(event.data.payload);
           }
           break;
         default:
@@ -28862,6 +29383,10 @@
         default:
           break;
       }
+    }
+    handleFilterEvent(data) {
+      this.filter.exclude = data.filter.exclude;
+      this.filter.only = data.filter.only;
     }
   };
 
@@ -33342,6 +33867,319 @@
     }
   };
 
+  // ../browser-lib/src/element-inspector/element-inspector.ts
+  var ElementInspector = class _ElementInspector {
+    constructor(rootDocument = document, defaultView, topLevelInspector) {
+      this.rootDocument = rootDocument;
+      this.defaultView = defaultView;
+      this.topLevelInspector = topLevelInspector;
+      this.wasHoveredElementSelected = false;
+      this.selected = [];
+      this.singleSelection = true;
+      this.subDocumentInspector = null;
+      this.listening = false;
+      this.onMouseOut = /* @__PURE__ */ __name((event) => {
+        elementHighlighter.clearHighlights();
+      }, "onMouseOut");
+      this.onMouseOver = /* @__PURE__ */ __name(async (event) => {
+        const target = event.composedPath()[0];
+        if ("getRootNode" in target) {
+          const rootNode = target.getRootNode();
+          if (rootNode !== this.rootDocument) {
+            this.handleSubDocument(rootNode, this.defaultView);
+            return;
+          }
+        }
+        if (target instanceof this.defaultView.HTMLIFrameElement) {
+          this.handleSubDocument(
+            target.contentDocument,
+            target.contentDocument.defaultView
+          );
+          return;
+        }
+        if (this.subDocumentInspector) {
+          this.stopSubDocumentInspector(true);
+        }
+        if (!(target instanceof this.defaultView.Element)) {
+          return;
+        }
+        if (target === this.hoveredElement || target.matches(".element-inspector-ignore")) {
+          return;
+        }
+        elementHighlighter.clearHighlights();
+        if (this.hoveredElement) {
+          this.hoveredElement.removeEventListener("click", this.onClick, {
+            capture: true
+          });
+        }
+        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(
+          target
+        );
+        elementHighlighter.highlightElement(target, {
+          text: locator.replace("frameLocator('iframe').", ""),
+          textPosition: "below",
+          textWidthType: "auto",
+          pointerEvents: "none",
+          classNames: ["element-inspector-ignore"]
+        });
+        const elementByLocator = await this.playwrightElementSelectorGenerator.selector(
+          selector,
+          parentFramesSelectors
+        );
+        if (elementByLocator !== target) {
+          elementHighlighter.highlightElement(elementByLocator, {
+            // highlightStyle: { outlineColor: "blue" },
+            clear: false,
+            pointerEvents: "none",
+            classNames: ["element-inspector-ignore"]
+          });
+        }
+        this.hoveredElement = target;
+        this.hoveredElementSelection = { locator, selector, parentFramesSelectors };
+        this.wasHoveredElementSelected = false;
+        target.addEventListener("click", this.onClick, {
+          capture: true
+        });
+      }, "onMouseOver");
+      this.onClick = /* @__PURE__ */ __name(async (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        if (this.wasHoveredElementSelected) {
+          return;
+        }
+        this.wasHoveredElementSelected = true;
+        this.selected.push(this.hoveredElementSelection);
+        if (this.singleSelection) {
+          this.topLevelInspector ? this.topLevelInspector.stop() : this.stop();
+        }
+        window.parent.postMessage(
+          {
+            type: "inspector-selection",
+            data: this.selected.at(this.selected.length - 1)
+          },
+          "*"
+        );
+        console.log("selected", this.selected);
+      }, "onClick");
+      this.handleSubDocument = /* @__PURE__ */ __name((newRootDocument, defaultView) => {
+        if (this.subDocumentInspector) {
+          if (this.subDocumentInspector.rootDocument === newRootDocument) {
+            return true;
+          }
+          this.stopSubDocumentInspector(true);
+        }
+        this.subDocumentInspector = new _ElementInspector(
+          newRootDocument,
+          defaultView,
+          this.topLevelInspector ?? this
+        );
+        this.subDocumentInspector.start(this.singleSelection);
+        return true;
+      }, "handleSubDocument");
+      this.stopSubDocumentInspector = /* @__PURE__ */ __name((clean) => {
+        if (this.subDocumentInspector) {
+          this.subDocumentInspector.stop(clean);
+          this.subDocumentInspector = null;
+        }
+      }, "stopSubDocumentInspector");
+      this.playwrightElementSelectorGenerator = new PlaywrightElementSelectorGenerator();
+      if (!defaultView) {
+        this.defaultView = this.rootDocument.nodeType === Node.DOCUMENT_NODE ? this.rootDocument.defaultView : window;
+      }
+    }
+    static {
+      __name(this, "ElementInspector");
+    }
+    start(singleSelection = true) {
+      this.singleSelection = singleSelection;
+      this.stop();
+      this.cleanSelection();
+      this.rootDocument.addEventListener("mouseover", this.onMouseOver);
+      this.rootDocument.addEventListener("mouseout", this.onMouseOut);
+      this.listening = true;
+    }
+    stop(clean = false) {
+      if (!this.listening) {
+        return;
+      }
+      this.listening = false;
+      if (this.subDocumentInspector) {
+        this.stopSubDocumentInspector(clean);
+      }
+      elementHighlighter.clearHighlights();
+      if (this.hoveredElement) {
+        this.hoveredElement.removeEventListener("click", this.onClick, {
+          capture: true
+        });
+      }
+      this.hoveredElement = null;
+      this.wasHoveredElementSelected = false;
+      this.rootDocument.removeEventListener("mouseover", this.onMouseOver);
+      if (clean) {
+        this.cleanSelection();
+      }
+    }
+    cleanSelection() {
+      if (this.subDocumentInspector) {
+        this.subDocumentInspector.cleanSelection();
+      }
+      this.selected = [];
+    }
+    consumeSelections() {
+      if (this.subDocumentInspector) {
+        return this.subDocumentInspector.consumeSelections();
+      }
+      const selected = this.selected;
+      this.cleanSelection();
+      return selected;
+    }
+  };
+
+  // src/lib/test-generator/assertions-observer/keybindings-manager.ts
+  var import_mousetrap = __toESM(require_mousetrap());
+  var KeybindingsManager = class {
+    constructor() {
+      this.listeners = {};
+    }
+    static {
+      __name(this, "KeybindingsManager");
+    }
+    addKeybinding(options) {
+      const key = options.key.toLowerCase();
+      const callback = options.callback;
+      if (this.listeners[key]) {
+        return;
+      }
+      this.listeners[key] = this._addKeybinding({ key, callback });
+    }
+    _addKeybinding({ key, callback }) {
+      return import_mousetrap.default.bind(key, (e2) => {
+        e2.preventDefault();
+        callback(e2);
+      });
+    }
+  };
+
+  // src/lib/test-generator/assertions-observer/assertions-observer.ts
+  var AssertionsObserver = class {
+    /**
+     *  Constructor adds keybindings listeners for creating assertions.
+     */
+    constructor(sessionRecorder) {
+      this.keybindingsManager = new KeybindingsManager();
+      this.createHandler = /* @__PURE__ */ __name((handler) => {
+        return {
+          handlerFunc: /* @__PURE__ */ __name((messageEvent) => {
+            try {
+              handler.handlerFunc(messageEvent);
+            } finally {
+              this.stopObserver();
+            }
+          }, "handlerFunc"),
+          handlerType: handler.handlerType
+        };
+      }, "createHandler");
+      this.toHaveTextHandler = /* @__PURE__ */ __name(() => (messageEvent) => {
+        const data = messageEvent?.data?.data;
+        const result2 = window.prompt(
+          `Please enter the expected text for the element:
+${data.locator}`
+        );
+        if (result2 === null) {
+          return;
+        }
+        this.sessionRecorder.addCustomEvent("assertion" /* Assertion */, {
+          matcher: `toHaveText("${result2}")`,
+          locator: data.locator,
+          thought: `Element should have text: ${result2}`
+        });
+      }, "toHaveTextHandler");
+      this.toBeVisibleHandler = /* @__PURE__ */ __name(() => (messageEvent) => {
+        const data = messageEvent?.data?.data;
+        this.sessionRecorder.addCustomEvent("assertion" /* Assertion */, {
+          matcher: `toBeVisible()`,
+          locator: data.locator,
+          thought: `Element ${data.locator} should be visible`
+        });
+      }, "toBeVisibleHandler");
+      this.sessionRecorder = sessionRecorder;
+    }
+    static {
+      __name(this, "AssertionsObserver");
+    }
+    init() {
+      this.keybindingsManager.addKeybinding({
+        key: "ctrl+meta+a",
+        callback: /* @__PURE__ */ __name(() => this.toggleObserver({
+          handlerFunc: this.toHaveTextHandler(),
+          handlerType: "toHaveText" /* toHaveText */
+        }), "callback")
+      });
+      this.keybindingsManager.addKeybinding({
+        key: "ctrl+meta+s",
+        callback: /* @__PURE__ */ __name(() => this.toggleObserver({
+          handlerFunc: this.toBeVisibleHandler(),
+          handlerType: "toBeVisible" /* toBeVisible */
+        }), "callback")
+      });
+    }
+    /**
+     * Switches the active assertion handler by removing any existing message listener,
+     * stopping the current `ElementInspector` if active, and starting a new observer with the provided handler.
+     * It then adds a one-time message event listener for the new handler.
+     */
+    toggleObserver(handler) {
+      const wrappedHandler = this.createHandler(handler);
+      if (this.activeHandler) {
+        window.removeEventListener("message", this.activeHandler.handlerFunc);
+        this.stopObserver();
+        if (this.activeHandler.handlerType === handler.handlerType) {
+          this.activeHandler = null;
+          return;
+        }
+      }
+      this.activeHandler = wrappedHandler;
+      this.startObserver();
+      window.addEventListener("message", wrappedHandler.handlerFunc, {
+        once: true
+      });
+    }
+    isInspectorActive() {
+      return !!this.elementInspector;
+    }
+    enableEventsFilter() {
+      this.sessionRecorder.addCustomEvent("filter" /* Filter */, {
+        filter: {
+          only: [
+            { type: EventType.Custom, tag: "assertion" /* Assertion */ }
+          ],
+          exclude: []
+        }
+      });
+    }
+    disableEventsFilter() {
+      this.sessionRecorder.addCustomEvent("filter" /* Filter */, {
+        filter: {
+          only: [],
+          exclude: []
+        }
+      });
+    }
+    startObserver() {
+      this.elementInspector = new ElementInspector(window.document);
+      this.elementInspector.start();
+      this.enableEventsFilter();
+    }
+    stopObserver() {
+      if (!this.isInspectorActive()) {
+        return;
+      }
+      this.elementInspector.stop();
+      this.elementInspector = null;
+      this.disableEventsFilter();
+    }
+  };
+
   // src/lib/test-generator/test-generator.ts
   var LOGS_PREFIX = "$checksum";
   var ChecksumTestGenerator = class {
@@ -33455,6 +34293,7 @@
     init(appSpecificRules, config = {}, {
       sessionRecorder: initSessionRecorder = true,
       filesObserver: initFilesObserver = false,
+      assertionsObserver: initAssertionsObserver = false,
       nativeDialogObserver: initNativeDialogObserver = false
     } = {}, options = {}) {
       this.appSpecificRules = appSpecificRules;
@@ -33475,6 +34314,10 @@
       if (initFilesObserver) {
         this.filesObserver = new FilesObserver(this.sessionMirror);
         this.filesObserver.init();
+      }
+      if (initAssertionsObserver) {
+        this.assertionsObserver = new AssertionsObserver(this.sessionMirror);
+        this.assertionsObserver.init();
       }
       if (initNativeDialogObserver) {
         this.nativeDialogObserver = new NativeDialogObserver(this.sessionMirror);
@@ -34551,7 +35394,7 @@
       super();
       this.events = [];
       this.previousEvent = null;
-      this.interactions = [];
+      this.steps = [];
       this.lastInteractionEventIndex = 0;
       this.sequences = [];
       this.sequenceMatcher = new SequenceMatcher();
@@ -34559,14 +35402,17 @@
       this.clickFilter = void 0;
       this.releasePendingInputAction = /* @__PURE__ */ __name(() => {
         clearTimeout(this.inputFilter.timeout);
-        this.addInteraction(this.inputFilter.action);
+        this.addStep({
+          step: this.inputFilter.action,
+          type: "action" /* Action */
+        });
         this.inputFilter = void 0;
       }, "releasePendingInputAction");
       this.releasePendingClickActions = /* @__PURE__ */ __name((addInteractions = true) => {
         clearTimeout(this.clickFilter.timeout);
         if (addInteractions) {
           this.clickFilter.actions.forEach(
-            (action) => this.addInteraction(action)
+            (action) => this.addStep({ step: action, type: "action" /* Action */ })
           );
         }
         this.clickFilter = void 0;
@@ -34650,8 +35496,8 @@
       this.sessionReplayer.start({ firstEventTimestamp: Date.now() });
     }
     // -------- [API] -------- //
-    getInteractions(fromIndex = 0) {
-      return this.interactions.slice(fromIndex);
+    getSteps(fromIndex = 0) {
+      return this.steps.slice(fromIndex);
     }
     // -------- [Events Lifecycle] -------- //
     preEvent(event) {
@@ -34709,7 +35555,7 @@
         action.files = [];
         action.files.push(data.text.split("\\").pop());
       }
-      this.addInteraction(action);
+      this.addStep({ step: action, type: "action" /* Action */ });
     }
     isConsecutiveInputEvent(event) {
       if (!this.inputFilter) {
@@ -34755,10 +35601,17 @@
             nativeDialog
           }
         );
-        this.addInteraction(action);
+        this.addStep({ step: action, type: "action" /* Action */ });
       } catch (e2) {
         console.error("handleNativeDialog", e2);
       }
+    }
+    // -------- [Assertions] -------- //
+    handleRecordAssertion(data, event) {
+      this.addStep({
+        step: this.makeAssertion(data),
+        type: "assertion" /* Assertion */
+      });
     }
     // -------- [Key Stroke] -------- //
     handleKeyStroke(data, event) {
@@ -34801,7 +35654,7 @@
       }
       const { selector } = await this.getNodeAndSelector(data.id);
       const action = this.makePageAction("double_click" /* DoubleClick */, event, selector);
-      this.addInteraction(action);
+      this.addStep({ step: action, type: "action" /* Action */ });
       this.releasePendingClickActions(false);
     }
     buildSequences() {
@@ -34817,7 +35670,9 @@
         if (result2) {
           const actions = await sequence.handler(result2);
           if (actions) {
-            actions.forEach((action) => this.addInteraction(action));
+            actions.forEach(
+              (action) => this.addStep({ step: action, type: "action" /* Action */ })
+            );
           }
         }
       }
@@ -34849,12 +35704,20 @@
           return false;
       }
     }
-    addInteraction(action) {
-      if (!action.id) {
-        action.id = Date.now().toString();
+    addStep(step) {
+      if (step.type === "action" /* Action */ && !step.step.id) {
+        step.step.id = Date.now().toString();
       }
-      this.interactions.push(action);
+      this.steps.push(step);
       this.lastInteractionEventIndex = this.events.length;
+    }
+    makeAssertion(data) {
+      return {
+        matcher: data.matcher,
+        locator: data.locator,
+        thought: data.thought,
+        id: data?.id || Date.now().toString()
+      };
     }
     makePageAction(eventCode, event, selector, data = {}) {
       console.log(
@@ -34863,7 +35726,7 @@
         Date.now() - event.timestamp
       );
       return {
-        nodeId: this.interactions.length.toString(),
+        nodeId: this.steps.length.toString(),
         eventCode,
         selector: selector.playwrightSelector,
         locator: selector.playwrightLocator,
@@ -34871,6 +35734,7 @@
         esraMetadata: selector.esraMetadata,
         pageId: void 0,
         timestamp: event.timestamp,
+        id: data?.id || Date.now().toString(),
         ...data
       };
     }
@@ -34928,174 +35792,6 @@
     }
   };
 
-  // ../browser-lib/src/element-inspector/element-inspector.ts
-  var ElementInspector = class _ElementInspector {
-    constructor(rootDocument = document, defaultView, topLevelInspector) {
-      this.rootDocument = rootDocument;
-      this.defaultView = defaultView;
-      this.topLevelInspector = topLevelInspector;
-      this.wasHoveredElementSelected = false;
-      this.selected = [];
-      this.singleSelection = true;
-      this.subDocumentInspector = null;
-      this.listening = false;
-      this.onMouseOut = /* @__PURE__ */ __name((event) => {
-        elementHighlighter.clearHighlights();
-      }, "onMouseOut");
-      this.onMouseOver = /* @__PURE__ */ __name(async (event) => {
-        const target = event.composedPath()[0];
-        if ("getRootNode" in target) {
-          const rootNode = target.getRootNode();
-          if (rootNode !== this.rootDocument) {
-            this.handleSubDocument(rootNode, this.defaultView);
-            return;
-          }
-        }
-        if (target instanceof this.defaultView.HTMLIFrameElement) {
-          this.handleSubDocument(
-            target.contentDocument,
-            target.contentDocument.defaultView
-          );
-          return;
-        }
-        if (this.subDocumentInspector) {
-          this.stopSubDocumentInspector(true);
-        }
-        if (!(target instanceof this.defaultView.Element)) {
-          return;
-        }
-        if (target === this.hoveredElement || target.matches(".element-inspector-ignore")) {
-          return;
-        }
-        elementHighlighter.clearHighlights();
-        if (this.hoveredElement) {
-          this.hoveredElement.removeEventListener("click", this.onClick, {
-            capture: true
-          });
-        }
-        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(
-          target
-        );
-        elementHighlighter.highlightElement(target, {
-          text: locator.replace("frameLocator('iframe').", ""),
-          textPosition: "below",
-          textWidthType: "auto",
-          pointerEvents: "none",
-          classNames: ["element-inspector-ignore"]
-        });
-        const elementByLocator = await this.playwrightElementSelectorGenerator.selector(
-          selector,
-          parentFramesSelectors
-        );
-        if (elementByLocator !== target) {
-          elementHighlighter.highlightElement(elementByLocator, {
-            // highlightStyle: { outlineColor: "blue" },
-            clear: false,
-            pointerEvents: "none",
-            classNames: ["element-inspector-ignore"]
-          });
-        }
-        this.hoveredElement = target;
-        this.hoveredElementSelection = { locator, selector, parentFramesSelectors };
-        this.wasHoveredElementSelected = false;
-        target.addEventListener("click", this.onClick, {
-          capture: true
-        });
-      }, "onMouseOver");
-      this.onClick = /* @__PURE__ */ __name(async (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        if (this.wasHoveredElementSelected) {
-          return;
-        }
-        this.wasHoveredElementSelected = true;
-        this.selected.push(this.hoveredElementSelection);
-        if (this.singleSelection) {
-          this.topLevelInspector ? this.topLevelInspector.stop() : this.stop();
-        }
-        window.parent.postMessage(
-          {
-            type: "inspector-selection",
-            data: this.selected.at(this.selected.length - 1)
-          },
-          "*"
-        );
-        console.log("selected", this.selected);
-      }, "onClick");
-      this.handleSubDocument = /* @__PURE__ */ __name((newRootDocument, defaultView) => {
-        if (this.subDocumentInspector) {
-          if (this.subDocumentInspector.rootDocument === newRootDocument) {
-            return true;
-          }
-          this.stopSubDocumentInspector(true);
-        }
-        this.subDocumentInspector = new _ElementInspector(
-          newRootDocument,
-          defaultView,
-          this.topLevelInspector ?? this
-        );
-        this.subDocumentInspector.start(this.singleSelection);
-        return true;
-      }, "handleSubDocument");
-      this.stopSubDocumentInspector = /* @__PURE__ */ __name((clean) => {
-        if (this.subDocumentInspector) {
-          this.subDocumentInspector.stop(clean);
-          this.subDocumentInspector = null;
-        }
-      }, "stopSubDocumentInspector");
-      this.playwrightElementSelectorGenerator = new PlaywrightElementSelectorGenerator();
-      if (!defaultView) {
-        this.defaultView = this.rootDocument.nodeType === Node.DOCUMENT_NODE ? this.rootDocument.defaultView : window;
-      }
-    }
-    static {
-      __name(this, "ElementInspector");
-    }
-    start(singleSelection = true) {
-      this.singleSelection = singleSelection;
-      this.stop();
-      this.cleanSelection();
-      this.rootDocument.addEventListener("mouseover", this.onMouseOver);
-      this.rootDocument.addEventListener("mouseout", this.onMouseOut);
-      this.listening = true;
-    }
-    stop(clean = false) {
-      if (!this.listening) {
-        return;
-      }
-      this.listening = false;
-      if (this.subDocumentInspector) {
-        this.stopSubDocumentInspector(clean);
-      }
-      elementHighlighter.clearHighlights();
-      if (this.hoveredElement) {
-        this.hoveredElement.removeEventListener("click", this.onClick, {
-          capture: true
-        });
-      }
-      this.hoveredElement = null;
-      this.wasHoveredElementSelected = false;
-      this.rootDocument.removeEventListener("mouseover", this.onMouseOver);
-      if (clean) {
-        this.cleanSelection();
-      }
-    }
-    cleanSelection() {
-      if (this.subDocumentInspector) {
-        this.subDocumentInspector.cleanSelection();
-      }
-      this.selected = [];
-    }
-    consumeSelections() {
-      if (this.subDocumentInspector) {
-        return this.subDocumentInspector.consumeSelections();
-      }
-      const selected = this.selected;
-      this.cleanSelection();
-      return selected;
-    }
-  };
-
   // ../browser-lib/src/visual-test-generator/visual-test-generator.ts
   var VisualTestGenerator = class {
     constructor(timeMachine) {
@@ -35110,12 +35806,12 @@
       this.timeMachine.setEventHandlers(this.eventHandlers, true);
     }
     consumeInteractions() {
-      const interactions = this.eventHandlers.getInteractions(
+      const interactions = this.eventHandlers.getSteps(
         this.lengthOfConsumedInteractions
       );
       this.lengthOfConsumedInteractions += interactions.length;
       window.checksumSendMessage("vtg", {
-        type: "consume-interactions",
+        type: "consume-steps",
         data: interactions
       });
       return interactions;

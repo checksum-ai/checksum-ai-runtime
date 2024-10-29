@@ -282,6 +282,7 @@ export function getChecksumConfig(
 type ChecksumPlaywrightTestArgs = Omit<PlaywrightTestArgs, "page"> & {
   page: IChecksumPage;
   variablesStore: IVariablesStore;
+  vs: IVariablesStore;
 };
 
 type ChecksumTestType<TestArgs> = TestType<
