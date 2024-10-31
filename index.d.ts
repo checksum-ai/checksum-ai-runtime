@@ -27,11 +27,20 @@ type ModifyLocatorMethodToChecksumLocator<T> = {
     ? (...args: Parameters<T[K]>) => ChecksumLocator // Change its return type to ChecksumLocator
     : T[K]; // Keep the rest of the fields as they are
 };
+type ModifyFrameLocatorMethodToChecksumFrameLocator<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => FrameLocator // Check if the property is a function returning Locator
+    ? (...args: Parameters<T[K]>) => ChecksumFrameLocator // Change its return type to ChecksumLocator
+    : T[K]; // Keep the rest of the fields as they are
+};
+
+type ModifyPlaywrightLocatorMethods<T> =
+  ModifyFrameLocatorMethodToChecksumFrameLocator<
+    ModifyLocatorMethodToChecksumLocator<T>
+  >;
 
 export interface IChecksumPage
-  extends Omit<ModifyLocatorMethodToChecksumLocator<Page>, "frameLocator">,
-    CompoundSelectionInterface,
-    FrameLocatorOwner {
+  extends ModifyPlaywrightLocatorMethods<Page>,
+    CompoundSelectionInterface {
   checksumSelector: (id: string) => IChecksumPage;
   checksumAI: ChecksumAIMethod;
 
@@ -105,18 +114,13 @@ export interface CompoundSelectionInterface {
   }): ChecksumLocator;
 }
 
-export interface FrameLocatorOwner {
-  frameLocator: (selector: string) => ChecksumFrameLocator;
-}
-
 export interface ChecksumFrameLocator
-  extends FrameLocator,
+  extends ModifyPlaywrightLocatorMethods<FrameLocator>,
     CompoundSelectionInterface {}
 
 export interface ChecksumLocator
-  extends Omit<ModifyLocatorMethodToChecksumLocator<Locator>, "frameLocator">,
-    CompoundSelectionInterface,
-    FrameLocatorOwner {
+  extends ModifyPlaywrightLocatorMethods<Locator>,
+    CompoundSelectionInterface {
   canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
 }
 

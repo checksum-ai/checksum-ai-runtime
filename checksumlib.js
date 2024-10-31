@@ -2657,12 +2657,12 @@
             return isDrop ? baseSlice(array, fromRight ? 0 : index2, fromRight ? index2 + 1 : length) : baseSlice(array, fromRight ? index2 + 1 : 0, fromRight ? length : index2);
           }
           __name(baseWhile, "baseWhile");
-          function baseWrapperValue(value, actions) {
+          function baseWrapperValue(value, actions2) {
             var result3 = value;
             if (result3 instanceof LazyWrapper) {
               result3 = result3.value();
             }
-            return arrayReduce(actions, function(result4, action) {
+            return arrayReduce(actions2, function(result4, action) {
               return action.func.apply(action.thisArg, arrayPush([result4], action.args));
             }, result3);
           }
@@ -5883,8 +5883,8 @@
                 object.prototype[methodName] = function() {
                   var chainAll = this.__chain__;
                   if (chain2 || chainAll) {
-                    var result3 = object(this.__wrapped__), actions = result3.__actions__ = copyArray(this.__actions__);
-                    actions.push({ "func": func, "args": arguments, "thisArg": object });
+                    var result3 = object(this.__wrapped__), actions2 = result3.__actions__ = copyArray(this.__actions__);
+                    actions2.push({ "func": func, "args": arguments, "thisArg": object });
                     result3.__chain__ = chainAll;
                     return result3;
                   }
@@ -11462,7 +11462,6 @@
       inspectInteractableElements = this.defaultModulesState.inspectInteractableElements
     } = {}) {
       if (!node2) return null;
-      console.log("[SessionDigesterSelector] generating for node", node2);
       const selector = {};
       if (extractEsraMetadata) {
         console.log("extracting ESRA metadata...");
@@ -26169,13 +26168,13 @@
     static {
       __name(this, "Timer");
     }
-    constructor(actions = [], config) {
+    constructor(actions2 = [], config) {
       __publicField(this, "timeOffset", 0);
       __publicField(this, "speed");
       __publicField(this, "actions");
       __publicField(this, "raf", null);
       __publicField(this, "lastTimestamp");
-      this.actions = actions;
+      this.actions = actions2;
       this.speed = config.speed;
     }
     /**
@@ -29507,15 +29506,15 @@
       if (this.isLive) {
         this.liveEvents = this.events;
       }
+      const events = getEvents2();
+      if (events.length === this.currentTraveledNumberOfEvents) {
+        return;
+      }
       this.stop();
       this.events = [];
       this.castedEvents = [];
       this.start(this.startOptions);
       this.isLive = false;
-      const events = getEvents2();
-      if (events.length === this.currentTraveledNumberOfEvents) {
-        return;
-      }
       this.currentTraveledNumberOfEvents = events.length;
       await this.fastForward(events, true);
       if (sleepAfter) {
@@ -30831,25 +30830,298 @@
     }
   };
 
+  // ../../node_modules/deepmerge-ts/dist/index.mjs
+  var actions = {
+    defaultMerge: Symbol("deepmerge-ts: default merge"),
+    skip: Symbol("deepmerge-ts: skip")
+  };
+  var actionsInto = {
+    defaultMerge: actions.defaultMerge
+  };
+  function defaultMetaDataUpdater(previousMeta, metaMeta) {
+    return metaMeta;
+  }
+  __name(defaultMetaDataUpdater, "defaultMetaDataUpdater");
+  function defaultFilterValues(values, meta) {
+    return values.filter((value) => value !== void 0);
+  }
+  __name(defaultFilterValues, "defaultFilterValues");
+  var ObjectType;
+  (function(ObjectType2) {
+    ObjectType2[ObjectType2["NOT"] = 0] = "NOT";
+    ObjectType2[ObjectType2["RECORD"] = 1] = "RECORD";
+    ObjectType2[ObjectType2["ARRAY"] = 2] = "ARRAY";
+    ObjectType2[ObjectType2["SET"] = 3] = "SET";
+    ObjectType2[ObjectType2["MAP"] = 4] = "MAP";
+    ObjectType2[ObjectType2["OTHER"] = 5] = "OTHER";
+  })(ObjectType || (ObjectType = {}));
+  function getObjectType(object) {
+    if (typeof object !== "object" || object === null) {
+      return 0;
+    }
+    if (Array.isArray(object)) {
+      return 2;
+    }
+    if (isRecord(object)) {
+      return 1;
+    }
+    if (object instanceof Set) {
+      return 3;
+    }
+    if (object instanceof Map) {
+      return 4;
+    }
+    return 5;
+  }
+  __name(getObjectType, "getObjectType");
+  function getKeys(objects) {
+    const keys = /* @__PURE__ */ new Set();
+    for (const object of objects) {
+      for (const key of [...Object.keys(object), ...Object.getOwnPropertySymbols(object)]) {
+        keys.add(key);
+      }
+    }
+    return keys;
+  }
+  __name(getKeys, "getKeys");
+  function objectHasProperty(object, property) {
+    return typeof object === "object" && Object.prototype.propertyIsEnumerable.call(object, property);
+  }
+  __name(objectHasProperty, "objectHasProperty");
+  function getIterableOfIterables(iterables) {
+    let m_iterablesIndex = 0;
+    let m_iterator = iterables[0]?.[Symbol.iterator]();
+    return {
+      [Symbol.iterator]() {
+        return {
+          next() {
+            do {
+              if (m_iterator === void 0) {
+                return { done: true, value: void 0 };
+              }
+              const result2 = m_iterator.next();
+              if (result2.done === true) {
+                m_iterablesIndex += 1;
+                m_iterator = iterables[m_iterablesIndex]?.[Symbol.iterator]();
+                continue;
+              }
+              return {
+                done: false,
+                value: result2.value
+              };
+            } while (true);
+          }
+        };
+      }
+    };
+  }
+  __name(getIterableOfIterables, "getIterableOfIterables");
+  var validRecordToStringValues = ["[object Object]", "[object Module]"];
+  function isRecord(value) {
+    if (!validRecordToStringValues.includes(Object.prototype.toString.call(value))) {
+      return false;
+    }
+    const { constructor } = value;
+    if (constructor === void 0) {
+      return true;
+    }
+    const prototype = constructor.prototype;
+    if (prototype === null || typeof prototype !== "object" || !validRecordToStringValues.includes(Object.prototype.toString.call(prototype))) {
+      return false;
+    }
+    if (!prototype.hasOwnProperty("isPrototypeOf")) {
+      return false;
+    }
+    return true;
+  }
+  __name(isRecord, "isRecord");
+  function mergeRecords$1(values, utils, meta) {
+    const result2 = {};
+    for (const key of getKeys(values)) {
+      const propValues = [];
+      for (const value of values) {
+        if (objectHasProperty(value, key)) {
+          propValues.push(value[key]);
+        }
+      }
+      if (propValues.length === 0) {
+        continue;
+      }
+      const updatedMeta = utils.metaDataUpdater(meta, {
+        key,
+        parents: values
+      });
+      const propertyResult = mergeUnknowns(propValues, utils, updatedMeta);
+      if (propertyResult === actions.skip) {
+        continue;
+      }
+      if (key === "__proto__") {
+        Object.defineProperty(result2, key, {
+          value: propertyResult,
+          configurable: true,
+          enumerable: true,
+          writable: true
+        });
+      } else {
+        result2[key] = propertyResult;
+      }
+    }
+    return result2;
+  }
+  __name(mergeRecords$1, "mergeRecords$1");
+  function mergeArrays$1(values) {
+    return values.flat();
+  }
+  __name(mergeArrays$1, "mergeArrays$1");
+  function mergeSets$1(values) {
+    return new Set(getIterableOfIterables(values));
+  }
+  __name(mergeSets$1, "mergeSets$1");
+  function mergeMaps$1(values) {
+    return new Map(getIterableOfIterables(values));
+  }
+  __name(mergeMaps$1, "mergeMaps$1");
+  function mergeOthers$1(values) {
+    return values.at(-1);
+  }
+  __name(mergeOthers$1, "mergeOthers$1");
+  var mergeFunctions = {
+    mergeRecords: mergeRecords$1,
+    mergeArrays: mergeArrays$1,
+    mergeSets: mergeSets$1,
+    mergeMaps: mergeMaps$1,
+    mergeOthers: mergeOthers$1
+  };
+  function deepmerge(...objects) {
+    return deepmergeCustom({})(...objects);
+  }
+  __name(deepmerge, "deepmerge");
+  function deepmergeCustom(options, rootMetaData) {
+    const utils = getUtils(options, customizedDeepmerge);
+    function customizedDeepmerge(...objects) {
+      return mergeUnknowns(objects, utils, rootMetaData);
+    }
+    __name(customizedDeepmerge, "customizedDeepmerge");
+    return customizedDeepmerge;
+  }
+  __name(deepmergeCustom, "deepmergeCustom");
+  function getUtils(options, customizedDeepmerge) {
+    return {
+      defaultMergeFunctions: mergeFunctions,
+      mergeFunctions: {
+        ...mergeFunctions,
+        ...Object.fromEntries(Object.entries(options).filter(([key, option]) => Object.hasOwn(mergeFunctions, key)).map(([key, option]) => option === false ? [key, mergeFunctions.mergeOthers] : [key, option]))
+      },
+      metaDataUpdater: options.metaDataUpdater ?? defaultMetaDataUpdater,
+      deepmerge: customizedDeepmerge,
+      useImplicitDefaultMerging: options.enableImplicitDefaultMerging ?? false,
+      filterValues: options.filterValues === false ? void 0 : options.filterValues ?? defaultFilterValues,
+      actions
+    };
+  }
+  __name(getUtils, "getUtils");
+  function mergeUnknowns(values, utils, meta) {
+    const filteredValues = utils.filterValues?.(values, meta) ?? values;
+    if (filteredValues.length === 0) {
+      return void 0;
+    }
+    if (filteredValues.length === 1) {
+      return mergeOthers(filteredValues, utils, meta);
+    }
+    const type = getObjectType(filteredValues[0]);
+    if (type !== 0 && type !== 5) {
+      for (let m_index = 1; m_index < filteredValues.length; m_index++) {
+        if (getObjectType(filteredValues[m_index]) === type) {
+          continue;
+        }
+        return mergeOthers(filteredValues, utils, meta);
+      }
+    }
+    switch (type) {
+      case 1: {
+        return mergeRecords(filteredValues, utils, meta);
+      }
+      case 2: {
+        return mergeArrays(filteredValues, utils, meta);
+      }
+      case 3: {
+        return mergeSets(filteredValues, utils, meta);
+      }
+      case 4: {
+        return mergeMaps(filteredValues, utils, meta);
+      }
+      default: {
+        return mergeOthers(filteredValues, utils, meta);
+      }
+    }
+  }
+  __name(mergeUnknowns, "mergeUnknowns");
+  function mergeRecords(values, utils, meta) {
+    const result2 = utils.mergeFunctions.mergeRecords(values, utils, meta);
+    if (result2 === actions.defaultMerge || utils.useImplicitDefaultMerging && result2 === void 0 && utils.mergeFunctions.mergeRecords !== utils.defaultMergeFunctions.mergeRecords) {
+      return utils.defaultMergeFunctions.mergeRecords(values, utils, meta);
+    }
+    return result2;
+  }
+  __name(mergeRecords, "mergeRecords");
+  function mergeArrays(values, utils, meta) {
+    const result2 = utils.mergeFunctions.mergeArrays(values, utils, meta);
+    if (result2 === actions.defaultMerge || utils.useImplicitDefaultMerging && result2 === void 0 && utils.mergeFunctions.mergeArrays !== utils.defaultMergeFunctions.mergeArrays) {
+      return utils.defaultMergeFunctions.mergeArrays(values);
+    }
+    return result2;
+  }
+  __name(mergeArrays, "mergeArrays");
+  function mergeSets(values, utils, meta) {
+    const result2 = utils.mergeFunctions.mergeSets(values, utils, meta);
+    if (result2 === actions.defaultMerge || utils.useImplicitDefaultMerging && result2 === void 0 && utils.mergeFunctions.mergeSets !== utils.defaultMergeFunctions.mergeSets) {
+      return utils.defaultMergeFunctions.mergeSets(values);
+    }
+    return result2;
+  }
+  __name(mergeSets, "mergeSets");
+  function mergeMaps(values, utils, meta) {
+    const result2 = utils.mergeFunctions.mergeMaps(values, utils, meta);
+    if (result2 === actions.defaultMerge || utils.useImplicitDefaultMerging && result2 === void 0 && utils.mergeFunctions.mergeMaps !== utils.defaultMergeFunctions.mergeMaps) {
+      return utils.defaultMergeFunctions.mergeMaps(values);
+    }
+    return result2;
+  }
+  __name(mergeMaps, "mergeMaps");
+  function mergeOthers(values, utils, meta) {
+    const result2 = utils.mergeFunctions.mergeOthers(values, utils, meta);
+    if (result2 === actions.defaultMerge || utils.useImplicitDefaultMerging && result2 === void 0 && utils.mergeFunctions.mergeOthers !== utils.defaultMergeFunctions.mergeOthers) {
+      return utils.defaultMergeFunctions.mergeOthers(values);
+    }
+    return result2;
+  }
+  __name(mergeOthers, "mergeOthers");
+
   // ../browser-lib/src/session-recorder/session-recorder.ts
+  var DefaultOptions = {
+    sampling: {
+      mousemove: false
+    },
+    //mousemoveWait: 100,
+    userTriggeredOnInput: true,
+    maskInputOptions: {
+      password: false
+      // Do not mask password inputs
+    }
+  };
   var SessionRecorder = class {
-    constructor(eventHandler) {
+    // private currentURL;
+    constructor(eventHandler, options = {}) {
+      this.eventHandler = eventHandler;
+      this.options = options;
       this.logNativeMutationObserver = false;
       this.stopRRWebRecording = /* @__PURE__ */ __name(() => {
       }, "stopRRWebRecording");
       this.start = /* @__PURE__ */ __name(() => {
+        console.log("starting with options", this.options);
         this.stopRRWebRecording = record({
-          emit: this.eventHandler,
-          // [rrweb config changes]
-          sampling: {
-            mousemove: false
-          },
-          //mousemoveWait: 100,
-          userTriggeredOnInput: true,
-          maskInputOptions: {
-            password: false
-            // Do not mask password inputs
-          }
+          ...this.options,
+          emit: this.eventHandler
         });
         if (this.logNativeMutationObserver) {
           this.selfObserve();
@@ -30927,7 +31199,7 @@
         return record.mirror.getMeta(node2);
       }, "getMeta");
       this.eventHandler = eventHandler;
-      this.currentURL = window.location.href;
+      this.options = deepmerge(DefaultOptions, options);
     }
     static {
       __name(this, "SessionRecorder");
@@ -32617,7 +32889,12 @@
               return;
             }
             const selector = `[${feature.name}${feature.value ? `="${feature.value}"` : ""}]`;
-            if (element.parentElement?.querySelectorAll(selector).length > 1) {
+            try {
+              if (element.parentElement?.querySelectorAll(selector).length > 1) {
+                return;
+              }
+            } catch (error) {
+              console.warn(`Error checking selector - ${selector}, continuing`);
               return;
             }
             if (!cssKeyElements.some((el) => el.selector.includes(selector)) && this.getLocatorBase(element).locator(selector).element === element) {
@@ -33208,7 +33485,14 @@
       });
       const commonParents = this.getSmallestCommonParents(elementGroups).map(this.calculateElementSize).sort((a2, b) => a2.size - b.size).map((e2) => e2.element);
       if (!targetSelector) {
-        return commonParents.map((cp) => getElementWindowPlaywright(cp).selector(cp)).filter((s2) => s2);
+        return commonParents.map((cp) => {
+          const pw = getElementWindowPlaywright(cp);
+          if (!pw) {
+            console.warn("Failed getting playwright for element", cp);
+            return null;
+          }
+          return getElementWindowPlaywright(cp).selector(cp);
+        }).filter((s2) => s2);
       }
       return commonParents.map((cp) => {
         const playwright = getElementWindowPlaywright(cp);
@@ -34183,15 +34467,11 @@ ${data.locator}`
   // src/lib/test-generator/test-generator.ts
   var LOGS_PREFIX = "$checksum";
   var ChecksumTestGenerator = class {
-    constructor(options = {}) {
-      this.options = {
-        skipElementHighlighting: false
-      };
+    constructor() {
       this.testIdCounter = 0;
       this.initialized = false;
       FrontendLogger.setPrefix(LOGS_PREFIX);
       this.elementSelector = new PlaywrightElementSelectorGenerator();
-      this.options = { ...this.options, ...options };
       this.htmlReducer = new HTMLReducer();
       this.parentChainReducer = new ParentChainReducer();
       this.compoundSelector = new CompoundSelector(this.htmlReducer);
@@ -34295,10 +34575,9 @@ ${data.locator}`
       filesObserver: initFilesObserver = false,
       assertionsObserver: initAssertionsObserver = false,
       nativeDialogObserver: initNativeDialogObserver = false
-    } = {}, options = {}) {
+    } = {}) {
       this.appSpecificRules = appSpecificRules;
       this.config = config;
-      this.options = { ...this.options, ...options };
       if (this.initialized) {
         return;
       } else {
@@ -34308,7 +34587,7 @@ ${data.locator}`
         this.sessionMirror = new SessionRecorder((event) => {
           window.checksumSendBroadcastMessage?.("rrweb", [event]);
           rrwebEventsStorageManager.onRRwebEvent(event);
-        });
+        }, config.recordOptions);
         rrwebEventsStorageManager.initRRwebEvents();
       }
       if (initFilesObserver) {
@@ -34813,7 +35092,7 @@ ${data.locator}`
      * Highlights the given element on the page.
      */
     highlightElement(element, options = {}) {
-      if (this.options.skipElementHighlighting) {
+      if (this.config.skipElementHighlighting) {
         return;
       }
       elementHighlighter.highlightElement(element, options);
@@ -35168,7 +35447,7 @@ ${data.locator}`
     setShouldHandleEvents(shouldHandleEvents) {
       this.shouldHandleEvents = shouldHandleEvents;
     }
-    goBack(timestamp, options = {}) {
+    async goBack(timestamp, options = {}) {
       if (!timestamp) {
         return this.goLive();
       }
@@ -35201,7 +35480,6 @@ ${data.locator}`
       if (!node2) {
         return null;
       }
-      console.log("[SessionDigesterSelector] generating for node", node2);
       const selector = {};
       if (extractEsraMetadata) {
         try {
@@ -35390,8 +35668,9 @@ ${data.locator}`
 
   // ../browser-lib/src/visual-test-generator/time-machine-event-handlers.ts
   var VisualTestGenerationTimeMachineEventHandlers = class extends EventHandlersBase {
-    constructor() {
+    constructor(onStep) {
       super();
+      this.onStep = onStep;
       this.events = [];
       this.previousEvent = null;
       this.steps = [];
@@ -35668,9 +35947,9 @@ ${data.locator}`
           sequence.events
         );
         if (result2) {
-          const actions = await sequence.handler(result2);
-          if (actions) {
-            actions.forEach(
+          const actions2 = await sequence.handler(result2);
+          if (actions2) {
+            actions2.forEach(
               (action) => this.addStep({ step: action, type: "action" /* Action */ })
             );
           }
@@ -35710,6 +35989,7 @@ ${data.locator}`
       }
       this.steps.push(step);
       this.lastInteractionEventIndex = this.events.length;
+      this.onStep?.(step);
     }
     makeAssertion(data) {
       return {
@@ -35726,7 +36006,6 @@ ${data.locator}`
         Date.now() - event.timestamp
       );
       return {
-        nodeId: this.steps.length.toString(),
         eventCode,
         selector: selector.playwrightSelector,
         locator: selector.playwrightLocator,
@@ -35796,8 +36075,20 @@ ${data.locator}`
   var VisualTestGenerator = class {
     constructor(timeMachine) {
       this.timeMachine = timeMachine;
-      this.lengthOfConsumedInteractions = 0;
-      this.eventHandlers = new VisualTestGenerationTimeMachineEventHandlers();
+      // private lengthOfConsumedInteractions = 0;
+      this.sendRecordedSteps = false;
+      this.onNewRecordedStep = /* @__PURE__ */ __name((recordedStep) => {
+        if (!this.sendRecordedSteps) {
+          return;
+        }
+        window.parent.postMessage({
+          type: "new-recorded-step",
+          data: [recordedStep]
+        });
+      }, "onNewRecordedStep");
+      this.eventHandlers = new VisualTestGenerationTimeMachineEventHandlers(
+        this.onNewRecordedStep
+      );
     }
     static {
       __name(this, "VisualTestGenerator");
@@ -35805,16 +36096,8 @@ ${data.locator}`
     init() {
       this.timeMachine.setEventHandlers(this.eventHandlers, true);
     }
-    consumeInteractions() {
-      const interactions = this.eventHandlers.getSteps(
-        this.lengthOfConsumedInteractions
-      );
-      this.lengthOfConsumedInteractions += interactions.length;
-      window.checksumSendMessage("vtg", {
-        type: "consume-steps",
-        data: interactions
-      });
-      return interactions;
+    setSendRecordedSteps(sendRecordedSteps) {
+      this.sendRecordedSteps = sendRecordedSteps;
     }
     startInspector(singleSelection = true, rootDocument) {
       this.elementInspector = new ElementInspector(

@@ -325,7 +325,7 @@ interface ChecksumLocator extends Locator {
 ## CLI Commands
 
 1. `init` - Initialize the Checksum directory and configurations.
-2. `test` - Run Checksum tests. Accepts all [Playwright command line flags](https://playwright.dev/docs/test-cli). To override `checksum.config.ts`, pass full or partial JSON as a string, e.g., `--checksum-config='{"baseURL": "https://example.com"}'`.
+2. `test` - Run Checksum tests. Accepts all [Playwright command line flags](https://playwright.dev/docs/test-cli). To override `checksum.config.ts`, pass full or partial JSON as a string, e.g., `--cksm-config='{"baseURL": "https://example.com"}'`.
 3. `show-report` - Locally shows the latest test run HTML report. Only applicable following completion of a test run configured to output an HTML report.
 
 ## Running with GitHub Actions
