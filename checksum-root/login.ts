@@ -27,16 +27,6 @@ export default async function login(
   // await expect(page.getByText("Login Successful")).toBeVisible();
 
   /**
-   * Example with Environment Info:
-   * This example demonstrates how to log in using the environment and user info
-   */
-  // await page.goto(`${environmentInfo.environment.baseURL}/login`);
-  // await page.getByPlaceholder("Email...").fill(environmentInfo.user.username);
-  // await page.getByPlaceholder("Password...").fill(environmentInfo.user.password);
-  // await page.getByText("Login").click();
-  // await expect(page.getByText("Login Successful")).toBeVisible();
-
-  /**
    * Example with Default Username and Password:
    * This example demonstrates how to log in to a page using a predefined username and password from a config file.
    */
