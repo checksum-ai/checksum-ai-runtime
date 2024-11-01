@@ -1,9 +1,15 @@
-import { ChecksumConfig, IChecksumPage } from "@checksum-ai/runtime";
+import { 
+  ChecksumConfig, 
+  IChecksumPage,
+  ChecksumConfigEnvironment,
+  EnvironmentUser 
+} from "@checksum-ai/runtime";
 import { expect, request } from "@playwright/test";
 
 export default async function login(
   page: IChecksumPage,
-  config: ChecksumConfig
+  config: ChecksumConfig,
+  environmentInfo: { environment: ChecksumConfigEnvironment; user: EnvironmentUser }
 ) {
   /**
    * This code provides examples of how to write functions for different login scenarios.
@@ -17,6 +23,16 @@ export default async function login(
   // await page.goto("/login");
   // await page.getByPlaceholder("Email...").fill(process.env.username);
   // await page.getByPlaceholder("Password...").fill(process.env.password);
+  // await page.getByText("Login").click();
+  // await expect(page.getByText("Login Successful")).toBeVisible();
+
+  /**
+   * Example with Environment Info:
+   * This example demonstrates how to log in using the environment and user info
+   */
+  // await page.goto(`${environmentInfo.environment.baseURL}/login`);
+  // await page.getByPlaceholder("Email...").fill(environmentInfo.user.username);
+  // await page.getByPlaceholder("Password...").fill(environmentInfo.user.password);
   // await page.getByText("Login").click();
   // await expect(page.getByText("Login Successful")).toBeVisible();
 
