@@ -29510,6 +29510,21 @@
       if (events.length === this.currentTraveledNumberOfEvents) {
         return;
       }
+      const lastCheckoutEventIndex = events.reduce(
+        (lastCheckoutEventIndex2, event, index2) => {
+          return event.isCheckout && event.type === EventType.Meta ? index2 : lastCheckoutEventIndex2;
+        },
+        void 0
+      );
+      if (lastCheckoutEventIndex !== void 0) {
+        console.log(
+          "lastCheckoutEventIndex:",
+          lastCheckoutEventIndex,
+          "number of events to render:",
+          events.length - lastCheckoutEventIndex
+        );
+        events.splice(lastCheckoutEventIndex);
+      }
       this.stop();
       this.events = [];
       this.castedEvents = [];
@@ -32748,21 +32763,23 @@
           }));
         }
       }
-      let filteredCandidated = [];
+      let filteredCandidates = [];
       try {
-        filteredCandidated = locatorsCandidates.reduce((acc, candidate) => {
+        for (const candidate of locatorsCandidates) {
           this.checkTimeout();
-          acc.push(
-            ...candidate.elements.length === 1 ? [candidate] : this.reduceMultiCandidates(candidate)
-          );
-          return acc;
-        }, []);
+          if (candidate.elements.length === 1) {
+            filteredCandidates.push(candidate);
+            continue;
+          }
+          await awaitSleep(100);
+          filteredCandidates.push(...this.reduceMultiCandidates(candidate));
+        }
       } catch (error) {
         if (error instanceof TimeoutError) {
           console.log("Timeout error");
         }
       }
-      if (!filteredCandidated?.length) {
+      if (!filteredCandidates?.length) {
         console.log("no single element selector found");
         if (!expandCSSKeyElements) {
           return this.generate(element, cssKeyElements, {
@@ -32777,19 +32794,19 @@
       if (addCSSSelectorGenerator) {
         const cssSelection = await this.addCSSSelectorGenerator();
         if (cssSelection) {
-          filteredCandidated.unshift(cssSelection);
+          filteredCandidates.unshift(cssSelection);
         }
       }
       if (this.rootNode === document && useTextContent) {
         const { selector, locator } = await new PlaywrightElementSelectorGenerator().getSelectorAndLocator(
           this.targetElement
         );
-        filteredCandidated.unshift({
+        filteredCandidates.unshift({
           selector,
           locator
         });
       }
-      return filteredCandidated.map(({ selector, locator }) => ({
+      return filteredCandidates.map(({ selector, locator }) => ({
         selector,
         locator
       }));
@@ -32885,25 +32902,33 @@
             ({ name, value }) => value.length < 30 && !COVERED_ATTRIBUTES.includes(name)
           );
           newFeatures.forEach((feature) => {
-            if (added.length > limit - 1) {
-              return;
-            }
-            const selector = `[${feature.name}${feature.value ? `="${feature.value}"` : ""}]`;
             try {
-              if (element.parentElement?.querySelectorAll(selector).length > 1) {
+              if (added.length > limit - 1) {
                 return;
               }
+              const selector = `[${feature.name}${feature.value ? `="${feature.value}"` : ""}]`;
+              try {
+                if (!element.parentElement || element.parentElement.querySelectorAll(selector).length > 1) {
+                  return;
+                }
+              } catch (error) {
+                console.warn(`Error checking selector - ${selector}, continuing`);
+                return;
+              }
+              if (!cssKeyElements.some((el) => el.selector.includes(selector)) && this.getLocatorBase(element).locator(selector).element === element) {
+                const newFeature = {
+                  element,
+                  selector
+                };
+                cssKeyElements.push(newFeature);
+                added.push(newFeature);
+              }
             } catch (error) {
-              console.warn(`Error checking selector - ${selector}, continuing`);
-              return;
-            }
-            if (!cssKeyElements.some((el) => el.selector.includes(selector)) && this.getLocatorBase(element).locator(selector).element === element) {
-              const newFeature = {
-                element,
-                selector
-              };
-              cssKeyElements.push(newFeature);
-              added.push(newFeature);
+              console.warn(
+                "Error processing css key feature",
+                { name: feature.name, value: feature.value },
+                error
+              );
             }
           });
           element = element.parentElement;
@@ -34584,7 +34609,8 @@ ${data.locator}`
         this.initialized = true;
       }
       if (initSessionRecorder) {
-        this.sessionMirror = new SessionRecorder((event) => {
+        this.sessionMirror = new SessionRecorder((event, isCheckout) => {
+          event.isCheckout = isCheckout;
           window.checksumSendBroadcastMessage?.("rrweb", [event]);
           rrwebEventsStorageManager.onRRwebEvent(event);
         }, config.recordOptions);
