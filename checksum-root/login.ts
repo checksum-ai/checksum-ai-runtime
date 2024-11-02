@@ -1,9 +1,15 @@
-import { ChecksumConfig, IChecksumPage } from "@checksum-ai/runtime";
+import { 
+  ChecksumConfig, 
+  IChecksumPage,
+  ChecksumConfigEnvironment,
+  EnvironmentUser 
+} from "@checksum-ai/runtime";
 import { expect, request } from "@playwright/test";
 
 export default async function login(
   page: IChecksumPage,
-  config: ChecksumConfig
+  config: ChecksumConfig,
+  environmentInfo: { environment: ChecksumConfigEnvironment; user: EnvironmentUser }
 ) {
   /**
    * This code provides examples of how to write functions for different login scenarios.
