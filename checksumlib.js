@@ -9653,6 +9653,9 @@
     }
     getElementWindowPlaywright(node2) {
       const elementWindow = node2.ownerDocument.defaultView;
+      if (!elementWindow) {
+        return window.playwright;
+      }
       if (elementWindow !== window && !elementWindow.playwright) {
         elementWindow.playwright = window.playwright;
       }
@@ -9664,13 +9667,6 @@
           node2
         ).generateSelectorAndLocator(node2);
       } catch (error) {
-        console.log(
-          "get selector and locator error",
-          node2.nodeType,
-          node2,
-          "\n",
-          error
-        );
         if (retriesLeft > 0) {
           await (0, import_await_sleep.default)(500);
           return this.safeGetSelectorAndLocator(node2, {
@@ -32646,6 +32642,7 @@
       this.MAX_TESTING_SELECTORS = 50;
       this.MAX_SINGLE_ELEMENT_SELECTORS = 5;
       this.MAX_PROCESSING_TIME = 15e3;
+      this.MAX_MULTICANDIDATE_PROCESSING = 5;
     }
     static {
       __name(this, "PlaywrightCustomLocatorGenerator");
@@ -32714,7 +32711,7 @@
                 selector,
                 locator: this.getSelectorLocator(selector),
                 elements: elements.filter(
-                  (el) => isInstanceOfHTMLElement(el)
+                  (el) => isInstanceOfHTMLElement(el) || el.constructor.name === this.targetElement.constructor.name
                 )
               });
             }
@@ -32767,12 +32764,9 @@
       try {
         for (const candidate of locatorsCandidates) {
           this.checkTimeout();
-          if (candidate.elements.length === 1) {
-            filteredCandidates.push(candidate);
-            continue;
-          }
-          await awaitSleep(100);
-          filteredCandidates.push(...this.reduceMultiCandidates(candidate));
+          filteredCandidates.push(
+            ...candidate.elements.length === 1 ? [candidate] : await this.reduceMultiCandidates(candidate)
+          );
         }
       } catch (error) {
         if (error instanceof TimeoutError) {
@@ -32806,6 +32800,13 @@
           locator
         });
       }
+      filteredCandidates = filteredCandidates.concat(
+        await this.addOptionalParentSelector(
+          useTextContent,
+          addCSSSelectorGenerator,
+          expandCSSKeyElements
+        )
+      );
       return filteredCandidates.map(({ selector, locator }) => ({
         selector,
         locator
@@ -32885,6 +32886,26 @@
       } catch (error) {
         console.error("Error getting CSS selector", error);
       }
+    }
+    /**
+     * If playwright selector for element points at a different element - generate selectors for that element as well
+     * i.e - playwright can point at a parent button if element is a child of it
+     */
+    addOptionalParentSelector(useTextContent, addCSSSelectorGenerator, expandCSSKeyElements) {
+      const playwright = getElementWindowPlaywright(this.targetElement);
+      const playwrightTargetElement = playwright.locator(
+        playwright.selector(this.targetElement)
+      ).element;
+      if (playwrightTargetElement !== this.targetElement && playwrightTargetElement?.contains(this.targetElement)) {
+        return this.generate(playwrightTargetElement, [], {
+          isPartOfListItem: false,
+          isForContextElement: false,
+          useTextContent,
+          addCSSSelectorGenerator,
+          expandCSSKeyElements
+        });
+      }
+      return [];
     }
     /**
      * Add CSS key features to the element chain, based on attributes that are not covered by playwright selectors
@@ -33086,22 +33107,23 @@
      *
      * @returns array of new candidates that return only one element
      */
-    reduceMultiCandidates(candidate) {
+    async reduceMultiCandidates(candidate) {
+      await awaitSleep(100);
       const { elements } = candidate;
       const parts = candidate.selector.split(" >> ");
       const newCandidates = [];
+      const locatorBase = this.getLocatorBase(this.targetElement);
       const addCandidateWithSelector = /* @__PURE__ */ __name((selector) => {
         try {
           newCandidates.push({
             selector,
             locator: this.getSelectorLocator(selector),
-            elements: this.getLocatorBase(this.targetElement).locator(selector, candidate.options).elements.filter(
-              (el) => isInstanceOfHTMLElement(el)
-            ),
             options: candidate.options
           });
+          return newCandidates.length >= this.MAX_MULTICANDIDATE_PROCESSING;
         } catch (error) {
           console.error(error);
+          return false;
         }
       }, "addCandidateWithSelector");
       const addCSSFilterToLocator = /* @__PURE__ */ __name((filter) => candidate.selector + // if we used css selector with tag name - concatentate it with the filter
@@ -33111,6 +33133,12 @@
           this.targetElement.tagName.toLowerCase() + filter
         )}`
       )), "addCSSFilterToLocator");
+      const addIfSingularAndCheckLimit = /* @__PURE__ */ __name((selector) => {
+        if (locatorBase.locator(selector, candidate.options).elements.length === 1) {
+          return addCandidateWithSelector(selector);
+        }
+        return false;
+      }, "addIfSingularAndCheckLimit");
       if (elements.length < 5) {
         const index2 = elements.indexOf(this.targetElement);
         if (index2 !== -1) {
@@ -33123,41 +33151,38 @@
       )) {
         const index2 = Array.from(parent.children).indexOf(this.targetElement);
         if (index2 !== -1) {
-          addCandidateWithSelector(
-            addCSSFilterToLocator(`:nth-child(${index2 + 1})`)
-          );
+          const selector = addCSSFilterToLocator(`:nth-child(${index2 + 1})`);
+          if (addIfSingularAndCheckLimit(selector)) {
+            addCandidateWithSelector(selector);
+          }
         }
       }
-      Array.from(this.targetElement.classList).forEach((className) => {
+      for (const className of Array.from(this.targetElement.classList).filter(
+        (cls) => !CLASS_IGNORE_LIST.includes(cls)
+      )) {
         const selector = addCSSFilterToLocator(`.${escapeSelector(className)}`);
         try {
-          if (this.getLocatorBase(this.targetElement).locator(
-            selector,
-            candidate.options
-          ).elements.length === 1) {
-            addCandidateWithSelector(selector);
+          if (addIfSingularAndCheckLimit(selector)) {
+            return newCandidates;
           }
         } catch (error) {
           console.error(error);
         }
-      });
-      Array.from(this.targetElement.attributes).filter(
-        (attr) => !["class", "style", "id", "href", "src"].includes(attr.name)
-      ).forEach((attr) => {
+      }
+      for (const attr of Array.from(this.targetElement.attributes).filter(
+        (attr2) => !COVERED_ATTRIBUTES.includes(attr2.name)
+      )) {
         const selector = addCSSFilterToLocator(
           `[${attr.name}` + (attr.value ? `="${attr.value}"]` : "]")
         );
         try {
-          if (this.getLocatorBase(this.targetElement).locator(
-            selector,
-            candidate.options
-          ).elements.length === 1) {
-            addCandidateWithSelector(selector);
+          if (addIfSingularAndCheckLimit(selector)) {
+            return newCandidates;
           }
         } catch (error) {
           console.error(error);
         }
-      });
+      }
       return newCandidates;
     }
     getAllLocators(element, cssKeyElements, options = {}) {
@@ -33256,7 +33281,7 @@
         }
         return options.returnLocator ? `getByRole('${role}', { ${props.join(", ")} })` : `internal:role=${role}${props.map(([n2, v2]) => `[${n2}=${v2}]`).join("")}`;
       } catch (error) {
-        console.error("Error getting role locator", error);
+        console.error("Error getting role locator", error.message);
       }
     }
     getByTextLocator(element, options = {}) {
@@ -33395,7 +33420,14 @@
   __name(isInstanceOfHTMLElement, "isInstanceOfHTMLElement");
 
   // src/lib/test-generator/selectors/compound-selector.ts
-  var CLASS_IGNORE_LIST = [":hover", ":focus", ":active"];
+  var CLASS_IGNORE_LIST = [
+    ":hover",
+    ":focus",
+    ":active",
+    "\\:hover",
+    "\\:focus",
+    "\\:active"
+  ];
   var CompoundSelector = class {
     constructor(htmlReducer) {
       this.htmlReducer = htmlReducer;
@@ -33818,7 +33850,7 @@
       return path.join(" ").trim();
     }
     getSelectorPart(element, { useId = false, useClasses = true, useTag = true }) {
-      if (useId && element.id) {
+      if (useId && element.id && element.id.match(/^\D/)) {
         return `#${element.id}`;
       }
       let selector = useTag ? element.tagName.toLowerCase() : "";
