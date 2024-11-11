@@ -9714,9 +9714,6 @@
         this.restoreNodeAttributes(node2, removedAttributes);
         const result2 = await this.getElementWindowPlaywright(node2).$(selector);
         if (result2 !== node2) {
-          console.log(
-            `Selector ${selector} is not valid, trying to generate new one`
-          );
           ({ selector, locator } = await this.safeGetSelectorAndLocator(
             nodeHTML
           ));
@@ -29390,8 +29387,9 @@
   var SessionReplayer = class {
     constructor(config = {}) {
       this.events = [];
-      this.castedEvents = [];
+      this.numberOfCastedEvents = 0;
       this.isLive = true;
+      this.liveEvents = [];
       // private currentTraveledTimestamp: number = undefined;
       this.currentTraveledNumberOfEvents = void 0;
       this.config = {
@@ -29420,8 +29418,8 @@
         this.events = [...this.events, ...sortedNewEvents];
         const promise = new Promise((resolve2) => {
           this.onEventCast = (event) => {
-            this.castedEvents.push(event);
-            if (this.castedEvents.length === this.events.length) {
+            this.numberOfCastedEvents++;
+            if (this.numberOfCastedEvents === this.events.length) {
               this.onEventCast = void 0;
               resolve2();
             }
@@ -29438,6 +29436,20 @@
       this.getOriginalTimestamp = /* @__PURE__ */ __name((event) => {
         return event.originalTimestamp ?? event.timestamp;
       }, "getOriginalTimestamp");
+      this.trimEventsToLastCheckout = /* @__PURE__ */ __name((events) => {
+        const lastCheckoutEventIndex = events.reduce(
+          (lastCheckoutEventIndex2, event, index2) => {
+            return event.isCheckout && event.type === EventType.Meta ? index2 : lastCheckoutEventIndex2;
+          },
+          void 0
+        );
+        let trimmedEvents = events;
+        if (lastCheckoutEventIndex !== void 0) {
+          trimmedEvents = events.slice(lastCheckoutEventIndex);
+        }
+        const castedEvents = lastCheckoutEventIndex !== void 0 ? this.liveEvents.slice(0, lastCheckoutEventIndex) : [];
+        return { trimmedEvents, castedEvents, lastCheckoutEventIndex };
+      }, "trimEventsToLastCheckout");
       this.getNodeById = /* @__PURE__ */ __name((id) => {
         return this.replayer.getMirror().getNode(id);
       }, "getNodeById");
@@ -29445,36 +29457,49 @@
         return this.replayer.getMirror().getMeta(node2);
       }, "getMeta");
       this.config = { ...this.config, ...config };
+      this.goBackWithEvents = this.goBackWithEvents_native;
     }
     static {
       __name(this, "SessionReplayer");
     }
-    start(options) {
-      this.startOptions = options;
-      const {
-        firstEventTimestamp,
-        speed = 8,
-        useTimestampCompression = true
-      } = options;
+    makeReplayerConfig(live, { speed = 8 } = {}) {
       const playerConfig = {
         mouseTail: false,
         pauseAnimation: false,
         speed,
         triggerFocus: true,
         UNSAFE_replayCanvas: true,
-        liveMode: true,
+        liveMode: live,
         showDebug: false,
-        skipInactive: true
+        skipInactive: true,
+        inactivePeriodThreshold: 100
       };
       if (this.config.root) {
         playerConfig.root = this.config.root;
       }
-      this.replayer = new Replayer([], playerConfig);
+      return playerConfig;
+    }
+    makeReplayer(events, live, { speed = 8 } = {}) {
+      this.replayer = new Replayer(
+        events,
+        this.makeReplayerConfig(live, { speed })
+      );
       if (this.config.enableInteract) {
         this.replayer.enableInteract();
       } else {
         this.replayer.disableInteract();
       }
+    }
+    start(options, castedEvents = []) {
+      this.startOptions = options;
+      const {
+        firstEventTimestamp,
+        speed = 8,
+        useTimestampCompression = true
+      } = options;
+      this.events = castedEvents;
+      this.numberOfCastedEvents = castedEvents.length;
+      this.makeReplayer([], true, { speed });
       this.useTimestampCompression = useTimestampCompression;
       this.replayer.startLive(
         this.useTimestampCompression ? Date.now() : firstEventTimestamp
@@ -29485,20 +29510,23 @@
         }
       });
     }
-    getCurrentReplayPoint() {
-      return this.isLive ? this.events.length : this.currentTraveledNumberOfEvents;
+    async goLive(sleepAfter = 1e3) {
+      if (this.isLive) {
+        return;
+      }
+      this.stop();
+      this.currentTraveledNumberOfEvents = void 0;
+      const { trimmedEvents, castedEvents } = this.trimEventsToLastCheckout(
+        this.liveEvents
+      );
+      this.start(this.startOptions, castedEvents);
+      this.isLive = true;
+      await this.fastForward(trimmedEvents);
+      if (sleepAfter) {
+        await (0, import_await_sleep3.default)(sleepAfter);
+      }
     }
-    // private beforeGoBack() {
-    //   if (this.isLive) {
-    //     this.liveEvents = this.events;
-    //   }
-    //   this.stop();
-    //   this.events = [];
-    //   this.castedEvents = [];
-    //   this.start(this.startOptions);
-    //   this.isLive = false;
-    // }
-    async goBackWithEvents(getEvents2, { sleepAfter = 1e3 }) {
+    async goBackWithEvents_native(getEvents2, { sleepAfter = 1e3 }) {
       if (this.isLive) {
         this.liveEvents = this.events;
       }
@@ -29506,38 +29534,65 @@
       if (events.length === this.currentTraveledNumberOfEvents) {
         return;
       }
-      const lastCheckoutEventIndex = events.reduce(
-        (lastCheckoutEventIndex2, event, index2) => {
-          return event.isCheckout && event.type === EventType.Meta ? index2 : lastCheckoutEventIndex2;
-        },
-        void 0
-      );
-      if (lastCheckoutEventIndex !== void 0) {
-        console.log(
-          "lastCheckoutEventIndex:",
-          lastCheckoutEventIndex,
-          "number of events to render:",
-          events.length - lastCheckoutEventIndex
-        );
-        events.splice(lastCheckoutEventIndex);
-      }
       this.stop();
       this.events = [];
-      this.castedEvents = [];
-      this.start(this.startOptions);
+      this.numberOfCastedEvents = 0;
       this.isLive = false;
       this.currentTraveledNumberOfEvents = events.length;
-      await this.fastForward(events, true);
+      const { trimmedEvents } = this.trimEventsToLastCheckout(events);
+      this.makeReplayer(trimmedEvents, false, { speed: 360 });
+      this.replayer.play(trimmedEvents[trimmedEvents.length - 1].timestamp);
       if (sleepAfter) {
         await (0, import_await_sleep3.default)(sleepAfter);
       }
     }
-    async goBackToReplayPoint(replayPoint, {
-      sleepAfter = 1e3
-    } = {}) {
-      return this.goBackWithEvents(() => this.liveEvents.slice(0, replayPoint), {
-        sleepAfter
-      });
+    async goBackWithEvents_native2(getEvents2, { sleepAfter = 1e3 }) {
+      try {
+        const events = getEvents2();
+        const targetTimestamp = events[events.length - 1]?.timestamp ?? 0;
+        const getTimeForPause = /* @__PURE__ */ __name(() => {
+          return targetTimestamp - (this.events[0].timestamp ?? 0);
+        }, "getTimeForPause");
+        if (!this.isLive && targetTimestamp <= this.events[this.events.length - 1].timestamp) {
+          const timeForPause2 = getTimeForPause();
+          this.replayer.pause(timeForPause2);
+          return;
+        }
+        if (this.isLive) {
+          this.liveEvents = this.events;
+        }
+        this.stop();
+        this.events = this.liveEvents;
+        this.numberOfCastedEvents = this.liveEvents.length;
+        this.isLive = false;
+        this.makeReplayer(this.events, false, { speed: 360 });
+        const timeForPause = getTimeForPause();
+        this.replayer.pause(timeForPause);
+      } finally {
+        if (sleepAfter) {
+          await (0, import_await_sleep3.default)(sleepAfter);
+        }
+      }
+    }
+    async goBackWithEvents_FFwd(getEvents2, { sleepAfter = 1e3 }) {
+      if (this.isLive) {
+        this.liveEvents = this.events;
+      }
+      const events = getEvents2();
+      if (events.length === this.currentTraveledNumberOfEvents) {
+        return;
+      }
+      this.currentTraveledNumberOfEvents = events.length;
+      this.stop();
+      const { trimmedEvents, castedEvents } = this.trimEventsToLastCheckout(
+        this.liveEvents
+      );
+      this.start(this.startOptions, castedEvents);
+      this.isLive = false;
+      await this.fastForward(trimmedEvents, true);
+      if (sleepAfter) {
+        await (0, import_await_sleep3.default)(sleepAfter);
+      }
     }
     async goBack(timestamp, {
       sleepAfter = 1e3,
@@ -29576,21 +29631,6 @@
       return this.goBackWithEvents(getEvents2, {
         sleepAfter
       });
-    }
-    async goLive(sleepAfter = 1e3) {
-      if (this.isLive) {
-        return;
-      }
-      this.stop();
-      this.currentTraveledNumberOfEvents = void 0;
-      this.events = [];
-      this.castedEvents = [];
-      this.start(this.startOptions);
-      this.isLive = true;
-      await this.fastForward(this.liveEvents);
-      if (sleepAfter) {
-        await (0, import_await_sleep3.default)(sleepAfter);
-      }
     }
     getLastEventTimestamps() {
       const lastEvent = this.events[this.events.length - 1];
