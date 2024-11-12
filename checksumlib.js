@@ -29632,12 +29632,23 @@
         sleepAfter
       });
     }
-    getLastEventTimestamps() {
-      const lastEvent = this.events[this.events.length - 1];
+    async getLastEventTimestamps(snapshot2 = false) {
+      const lastEvent = snapshot2 ? await this.findLastFullSnapshotEvent() : this.events[this.events.length - 1];
       return {
         timestamp: lastEvent?.timestamp,
         originalTimestamp: lastEvent?.originalTimestamp
       };
+    }
+    async findLastFullSnapshotEvent() {
+      const event = this.events.reduce((snapshotEvent, event2) => {
+        return event2.type === EventType.FullSnapshot ? event2 : snapshotEvent;
+      }, void 0);
+      if (event) {
+        return event;
+      }
+      console.log("waiting for full snapshot event...");
+      await (0, import_await_sleep3.default)(1e3);
+      return this.findLastFullSnapshotEvent();
     }
   };
 
@@ -31573,7 +31584,8 @@
       clear = true,
       shouldFlipHighlightTextOutsideViewport = true,
       pointerEvents,
-      classNames = []
+      classNames = [],
+      renderDocument
     } = {}) {
       if (clear) {
         this.clearHighlights();
@@ -31581,16 +31593,30 @@
       if (!element) {
         return;
       }
-      const elementDocument = element.ownerDocument;
+      const iframeOffset = { left: 0, top: 0, right: 0, bottom: 0 };
+      if (renderDocument !== element.ownerDocument) {
+        let iframe = element.ownerDocument.defaultView?.frameElement;
+        while (iframe) {
+          const iframeRect = iframe.getBoundingClientRect();
+          iframeOffset.left += iframeRect.left;
+          iframeOffset.top += iframeRect.top;
+          iframe = iframe.ownerDocument.defaultView?.frameElement;
+        }
+      }
+      const elementDocument = renderDocument ?? element.ownerDocument;
       const isFixed = isAncestorOrSelfFixed(element);
-      const rect = element.getBoundingClientRect();
+      const elementBoundingBox = element.getBoundingClientRect();
+      const elementPositionWithOffset = {
+        top: elementBoundingBox.top + iframeOffset.top,
+        left: elementBoundingBox.left + iframeOffset.left
+      };
       const newElement = elementDocument.createElement("div");
       newElement.style.outline = "2px dashed rgba(255,0,0,.75)";
       newElement.style.position = isFixed ? "fixed" : "absolute";
-      newElement.style.left = rect.left + "px";
-      newElement.style.top = rect.top + "px";
-      newElement.style.width = rect.right - rect.left + "px";
-      newElement.style.height = rect.bottom - rect.top + "px";
+      newElement.style.left = elementPositionWithOffset.left + "px";
+      newElement.style.top = elementPositionWithOffset.top + "px";
+      newElement.style.width = elementBoundingBox.width + "px";
+      newElement.style.height = elementBoundingBox.height + "px";
       newElement.style.pointerEvents = pointerEvents ?? "none";
       newElement.style.zIndex = "2147483647";
       newElement.className = ["checksum-dom-cache-ignore", ...classNames].join(
@@ -31626,7 +31652,7 @@
         );
         hoverTextEl.innerText = text;
         hoverTextEl.style.fontSize = "12px";
-        hoverTextEl.style.width = textWidthType === "rect" ? `${rect.width}px` : "auto";
+        hoverTextEl.style.width = textWidthType === "rect" ? `${elementBoundingBox.width}px` : "auto";
         hoverTextEl.style.background = "#000000a1";
         hoverTextEl.style.color = "white";
         hoverTextEl.style.padding = "5px";
@@ -31634,9 +31660,9 @@
         hoverTextEl.style.pointerEvents = "none";
         hoverTextEl.style.userSelect = "none";
         if (textPosition === "above") {
-          hoverTextEl.style.bottom = `${rect.height}px`;
+          hoverTextEl.style.bottom = `${elementBoundingBox.height}px`;
         } else if (textPosition === "below") {
-          hoverTextEl.style.top = `${rect.height}px`;
+          hoverTextEl.style.top = `${elementBoundingBox.height}px`;
         }
         this.mergeStyle(hoverTextEl, textStyle);
         newElement.appendChild(hoverTextEl);
@@ -31654,17 +31680,17 @@
       elementDocument.body.appendChild(newElement);
       if (textPosition === "above" && getHeightOfCroppedElementAboveViewport(hoverTextEl) > 0) {
         hoverTextEl.style.bottom = "initial";
-        hoverTextEl.style.top = `${rect.height}px`;
+        hoverTextEl.style.top = `${elementBoundingBox.height}px`;
       } else if (textPosition === "below" && getHeightsOfCroppedElementBelowViewport(hoverTextEl) > 0) {
         hoverTextEl.style.top = "initial";
-        hoverTextEl.style.bottom = `${rect.height}px`;
+        hoverTextEl.style.bottom = `${elementBoundingBox.height}px`;
       }
       this.lastHighlights.push(newElement);
       if (shouldFlipHighlightTextOutsideViewport) {
         this.flipHighlightTextPositionOutsideViewport(
           hoverTextEl,
           textPosition,
-          rect.height
+          elementBoundingBox.height
         );
       }
     }
@@ -34271,7 +34297,7 @@
             return;
           }
         }
-        if (target instanceof this.defaultView.HTMLIFrameElement) {
+        if (isNodeInstanceOf(target, "HTMLIFrameElement")) {
           this.handleSubDocument(
             target.contentDocument,
             target.contentDocument.defaultView
@@ -34281,10 +34307,11 @@
         if (this.subDocumentInspector) {
           this.stopSubDocumentInspector(true);
         }
-        if (!(target instanceof this.defaultView.Element)) {
+        if (!isNodeInstanceOf(target, "HTMLElement")) {
           return;
         }
-        if (target === this.hoveredElement || target.matches(".element-inspector-ignore")) {
+        const targetElement = target;
+        if (targetElement === this.hoveredElement || targetElement.matches(".element-inspector-ignore")) {
           return;
         }
         elementHighlighter.clearHighlights();
@@ -34294,14 +34321,15 @@
           });
         }
         const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(
-          target
+          targetElement
         );
-        elementHighlighter.highlightElement(target, {
+        elementHighlighter.highlightElement(targetElement, {
           text: locator.replace("frameLocator('iframe').", ""),
           textPosition: "below",
           textWidthType: "auto",
           pointerEvents: "none",
-          classNames: ["element-inspector-ignore"]
+          classNames: ["element-inspector-ignore"],
+          renderDocument: this.defaultView.top.document
         });
         const elementByLocator = await this.playwrightElementSelectorGenerator.selector(
           selector,
@@ -34312,10 +34340,11 @@
             // highlightStyle: { outlineColor: "blue" },
             clear: false,
             pointerEvents: "none",
-            classNames: ["element-inspector-ignore"]
+            classNames: ["element-inspector-ignore"],
+            renderDocument: this.defaultView.top.document
           });
         }
-        this.hoveredElement = target;
+        this.hoveredElement = targetElement;
         this.hoveredElementSelection = { locator, selector, parentFramesSelectors };
         this.wasHoveredElementSelected = false;
         target.addEventListener("click", this.onClick, {
@@ -34471,16 +34500,14 @@ ${data.locator}`
         }
         this.sessionRecorder.addCustomEvent("assertion" /* Assertion */, {
           matcher: `toHaveText("${result2}")`,
-          locator: data.locator,
-          thought: `Element should have text: ${result2}`
+          locator: data.locator
         });
       }, "toHaveTextHandler");
       this.toBeVisibleHandler = /* @__PURE__ */ __name(() => (messageEvent) => {
         const data = messageEvent?.data?.data;
         this.sessionRecorder.addCustomEvent("assertion" /* Assertion */, {
           matcher: `toBeVisible()`,
-          locator: data.locator,
-          thought: `Element ${data.locator} should be visible`
+          locator: data.locator
         });
       }, "toBeVisibleHandler");
       this.sessionRecorder = sessionRecorder;
@@ -35557,8 +35584,8 @@ ${data.locator}`
     goLive() {
       return this.sessionReplayer.goLive();
     }
-    getLastEventTimestamps() {
-      return this.sessionReplayer.getLastEventTimestamps();
+    getLastEventTimestamps(snapshot2 = false) {
+      return this.sessionReplayer.getLastEventTimestamps(snapshot2);
     }
   };
 
