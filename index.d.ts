@@ -11,6 +11,7 @@ import {
   Dialog,
 } from "@playwright/test";
 
+import { ExpectWrapper } from "./index.helpers";
 interface ChecksumAIMethod {
   (title: string): IChecksumPage;
   <T>(title: string, body: () => T | Promise<T>): Promise<T>;
@@ -124,21 +125,14 @@ export interface ChecksumLocator
   canvasClick: (canvasText: string, rectSizeIndex?: number) => Promise<void>;
 }
 
-declare class Wrapper<ExtendedMatchers, T> {
-  expecter: Expect<ExtendedMatchers>;
-  apply(e: T);
-  soft(e: T);
-  poll(e: T);
-}
-
 type Apply_MakeMatchers<ExtendedMatchers, T> = ReturnType<
-  Wrapper<ExtendedMatchers, T>["apply"]
+  ExpectWrapper<ExtendedMatchers, T>["apply"]
 >;
 type Soft_MakeMatchers<ExtendedMatchers, T> = ReturnType<
-  Wrapper<ExtendedMatchers, T>["soft"]
+  ExpectWrapper<ExtendedMatchers, T>["soft"]
 >;
 type Poll_MakeMatchers<ExtendedMatchers, T> = ReturnType<
-  Wrapper<ExtendedMatchers, T>["poll"]
+  ExpectWrapper<ExtendedMatchers, T>["poll"]
 >;
 
 type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {

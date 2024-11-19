@@ -29512,14 +29512,22 @@
     }
     async goLive(sleepAfter = 1e3) {
       if (this.isLive) {
+        console.log("Already live, nothing to do.");
         return;
       }
+      console.log("Going live...");
       this.stop();
       this.currentTraveledNumberOfEvents = void 0;
       const { trimmedEvents, castedEvents } = this.trimEventsToLastCheckout(
         this.liveEvents
       );
-      this.start(this.startOptions, castedEvents);
+      this.start(
+        {
+          ...this.startOptions,
+          firstEventTimestamp: castedEvents.length ? castedEvents[0].timestamp : trimmedEvents[0].timestamp
+        },
+        castedEvents
+      );
       this.isLive = true;
       await this.fastForward(trimmedEvents);
       if (sleepAfter) {
