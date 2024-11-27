@@ -9663,9 +9663,13 @@
     }
     async safeGetSelectorAndLocator(node2, { retriesLeft = 3 } = {}) {
       try {
-        return await this.getElementWindowPlaywright(
-          node2
-        ).generateSelectorAndLocator(node2);
+        try {
+          return window.playwright.generateSelectorAndLocator(node2);
+        } catch (err) {
+          return this.getElementWindowPlaywright(node2).generateSelectorAndLocator(
+            node2
+          );
+        }
       } catch (error) {
         if (retriesLeft > 0) {
           await (0, import_await_sleep.default)(500);
@@ -9682,48 +9686,55 @@
       stripAttributes = true,
       ignoredIframesSelectors = []
     } = {}) {
-      if (!node2) return null;
-      const iframes = getIframes({ ignoredIframesSelectors });
-      const parentFramesSelectors = searchParentFrames ? await getParentFramesSelectors(node2, iframes, async (node3) => {
-        const selection = await this.getSelectorAndLocator(node3, {
-          searchParentFrames: false
-        });
-        return selection.selector;
-      }) : (
-        //   ? await this.getParentFramesSelectors(node, iframes)
-        []
-      );
-      const nodeHTML = node2;
-      const testSelector2 = this.getTestAttributeSelector(
-        nodeHTML,
-        testIdSelector
-      );
-      if (testSelector2) {
+      try {
+        if (!node2) return null;
+        const iframes = getIframes({ ignoredIframesSelectors });
+        const parentFramesSelectors = searchParentFrames ? await getParentFramesSelectors(node2, iframes, async (node3) => {
+          const selection = await this.getSelectorAndLocator(node3, {
+            searchParentFrames: false
+          });
+          return selection.selector;
+        }) : (
+          //   ? await this.getParentFramesSelectors(node, iframes)
+          []
+        );
+        const nodeHTML = node2;
+        const testSelector2 = this.getTestAttributeSelector(
+          nodeHTML,
+          testIdSelector
+        );
+        if (testSelector2) {
+          return {
+            selector: testSelector2,
+            locator: `locator("${testSelector2}")`,
+            parentFramesSelectors
+          };
+        }
+        let removedAttributes;
+        if (stripAttributes) {
+          removedAttributes = this.stripNodeAttributes(node2);
+        }
+        let { selector, locator } = await this.safeGetSelectorAndLocator(
+          nodeHTML
+        );
+        if (removedAttributes) {
+          this.restoreNodeAttributes(node2, removedAttributes);
+          const result2 = await this.getElementWindowPlaywright(node2).$(selector);
+          if (result2 !== node2) {
+            ({ selector, locator } = await this.safeGetSelectorAndLocator(
+              nodeHTML
+            ));
+          }
+        }
         return {
-          selector: testSelector2,
-          locator: `locator("${testSelector2}")`,
+          selector,
+          locator,
           parentFramesSelectors
         };
+      } catch (error) {
+        console.log("get selector and locator error", node2, error);
+        return { selector: "", locator: "" };
       }
-      let removedAttributes;
-      if (stripAttributes) {
-        removedAttributes = this.stripNodeAttributes(node2);
-      }
-      let { selector, locator } = await this.safeGetSelectorAndLocator(nodeHTML);
-      if (removedAttributes) {
-        this.restoreNodeAttributes(node2, removedAttributes);
-        const result2 = await this.getElementWindowPlaywright(node2).$(selector);
-        if (result2 !== node2) {
-          ({ selector, locator } = await this.safeGetSelectorAndLocator(
-            nodeHTML
-          ));
-        }
-      }
-      return {
-        selector,
-        locator,
-        parentFramesSelectors
-      };
     }
     async findIframeWindowByParentFrameSelectors(parentFramesSelectors = []) {
       let targetWindow = window.top;
@@ -10620,6 +10631,7 @@
       this.flashingElementsDetector = new FlashingElementsDetector();
       this.forceIncludeElements = [];
       this.preMapReducedHTMLSelectors = false;
+      this.useRrwebIdsAsChecksumIds = false;
       this.excludedNodes = 0;
       // how many nodes to reduce in percentage
       this.reducePercentage = 50;
@@ -10799,6 +10811,10 @@
               originalEl._rrwebid = sessionMirror.getMeta(originalEl)?.id?.toString() ?? "";
             }
             el.setAttribute("rrwebid", originalEl._rrwebid);
+            if (this.useRrwebIdsAsChecksumIds) {
+              el.setAttribute("checksumid", originalEl._rrwebid);
+              el._checksumid = originalEl._rrwebid;
+            }
           }
         }
         this.checksumIdToRRwebIdMap[originalEl._checksumid] = parseInt(
@@ -29431,7 +29447,13 @@
         return promise;
       }, "fastForward");
       this.stop = /* @__PURE__ */ __name(() => {
-        this.replayer.destroy();
+        try {
+          if (this.replayer) {
+            this.replayer.destroy();
+          }
+        } catch (e2) {
+          console.warn("Error destroying replayer", e2);
+        }
       }, "stop");
       this.getOriginalTimestamp = /* @__PURE__ */ __name((event) => {
         return event.originalTimestamp ?? event.timestamp;
@@ -29539,7 +29561,7 @@
         this.liveEvents = this.events;
       }
       const events = getEvents2();
-      if (events.length === this.currentTraveledNumberOfEvents) {
+      if (events.length === this.currentTraveledNumberOfEvents || events.length < 2) {
         return;
       }
       this.stop();
@@ -29548,6 +29570,10 @@
       this.isLive = false;
       this.currentTraveledNumberOfEvents = events.length;
       const { trimmedEvents } = this.trimEventsToLastCheckout(events);
+      if (trimmedEvents.length < 2) {
+        console.log("trimmedEvents.length is less than 2");
+        return;
+      }
       this.makeReplayer(trimmedEvents, false, { speed: 360 });
       this.replayer.play(trimmedEvents[trimmedEvents.length - 1].timestamp);
       if (sleepAfter) {
@@ -31604,7 +31630,7 @@
       const iframeOffset = { left: 0, top: 0, right: 0, bottom: 0 };
       if (renderDocument !== element.ownerDocument) {
         let iframe = element.ownerDocument.defaultView?.frameElement;
-        while (iframe) {
+        while (iframe && iframe.contentDocument !== renderDocument) {
           const iframeRect = iframe.getBoundingClientRect();
           iframeOffset.left += iframeRect.left;
           iframeOffset.top += iframeRect.top;
@@ -32114,7 +32140,7 @@
   function sanitizeRoot(input2, element) {
     if (isParentNode(input2)) {
       if (!input2.contains(element)) {
-        showWarning("element root mismatch", "Provided root does not contain the element. This will most likely result in producing a fallback selector using element's real root node. If you plan to use the selector using provided root (e.g. `root.querySelector`), it will nto work as intended.");
+        showWarning("element root mismatch", "Provided root does not contain the element. This will most likely result in producing a fallback selector using element's real root node. If you plan to use the selector using provided root (e.g. `root.querySelector`), it will not work as intended.");
       }
       return input2;
     }
@@ -32125,7 +32151,7 @@
       }
       return rootNode;
     }
-    return element.ownerDocument.querySelector(":root");
+    return getRootNode2(element);
   }
   __name(sanitizeRoot, "sanitizeRoot");
   function sanitizeMaxNumber(input2) {
@@ -32255,9 +32281,12 @@
     return `[${name}='${value}']`;
   }
   __name(attributeNodeToSelector, "attributeNodeToSelector");
-  function isValidAttributeNode({ nodeName }, element) {
+  function isValidAttributeNode({ nodeName, nodeValue }, element) {
     const tagName = element.tagName.toLowerCase();
     if (["input", "option"].includes(tagName) && nodeName === "value") {
+      return false;
+    }
+    if (nodeName === "src" && (nodeValue === null || nodeValue === void 0 ? void 0 : nodeValue.startsWith("data:"))) {
       return false;
     }
     return !attributeBlacklistMatch(nodeName);
@@ -32266,7 +32295,7 @@
   function sanitizeAttributeData({ nodeName, nodeValue }) {
     return {
       name: sanitizeSelectorItem(nodeName),
-      value: sanitizeSelectorItem(nodeValue)
+      value: sanitizeSelectorItem(nodeValue !== null && nodeValue !== void 0 ? nodeValue : void 0)
     };
   }
   __name(sanitizeAttributeData, "sanitizeAttributeData");
@@ -32286,7 +32315,8 @@
 
   // ../../node_modules/css-selector-generator/esm/selector-class.js
   function getElementClassSelectors(element) {
-    return (element.getAttribute("class") || "").trim().split(/\s+/).filter((item) => !INVALID_CLASS_RE.test(item)).map((item) => `.${sanitizeSelectorItem(item)}`);
+    var _a2;
+    return ((_a2 = element.getAttribute("class")) !== null && _a2 !== void 0 ? _a2 : "").trim().split(/\s+/).filter((item) => !INVALID_CLASS_RE.test(item)).map((item) => `.${sanitizeSelectorItem(item)}`);
   }
   __name(getElementClassSelectors, "getElementClassSelectors");
   function getClassSelectors(elements) {
@@ -32297,7 +32327,8 @@
 
   // ../../node_modules/css-selector-generator/esm/selector-id.js
   function getElementIdSelectors(element) {
-    const id = element.getAttribute("id") || "";
+    var _a2;
+    const id = (_a2 = element.getAttribute("id")) !== null && _a2 !== void 0 ? _a2 : "";
     const selector = `#${sanitizeSelectorItem(id)}`;
     const rootNode = element.getRootNode({ composed: false });
     return !INVALID_ID_RE.test(id) && testSelector([element], selector, rootNode) ? [selector] : [];
@@ -32315,7 +32346,9 @@
       const siblings = Array.from(parent.childNodes).filter(isElement2);
       const elementIndex = siblings.indexOf(element);
       if (elementIndex > -1) {
-        return [`:nth-child(${elementIndex + 1})`];
+        return [
+          `:nth-child(${String(elementIndex + 1)})`
+        ];
       }
     }
     return [];
@@ -32350,7 +32383,7 @@
       const elementIndex = siblings.indexOf(element);
       if (elementIndex > -1) {
         return [
-          `${tag}:nth-of-type(${elementIndex + 1})`
+          `${tag}:nth-of-type(${String(elementIndex + 1)})`
         ];
       }
     }
@@ -32426,8 +32459,7 @@
   var ESCAPED_COLON = ":".charCodeAt(0).toString(16).toUpperCase();
   var SPECIAL_CHARACTERS_RE = /[ !"#$%&'()\[\]{|}<>*+,./;=?@^`~\\]/;
   function sanitizeSelectorItem(input2 = "") {
-    var _a2, _b;
-    return (_b = (_a2 = CSS === null || CSS === void 0 ? void 0 : CSS.escape) === null || _a2 === void 0 ? void 0 : _a2.call(CSS, input2)) !== null && _b !== void 0 ? _b : legacySanitizeSelectorItem(input2);
+    return CSS ? CSS.escape(input2) : legacySanitizeSelectorItem(input2);
   }
   __name(sanitizeSelectorItem, "sanitizeSelectorItem");
   function legacySanitizeSelectorItem(input2 = "") {
@@ -32463,8 +32495,7 @@
   }
   __name(getElementSelectorsByType, "getElementSelectorsByType");
   function getSelectorsByType(elements, selector_type) {
-    var _a2;
-    const getter = (_a2 = SELECTOR_TYPE_GETTERS[selector_type]) !== null && _a2 !== void 0 ? _a2 : () => [];
+    const getter = SELECTOR_TYPE_GETTERS[selector_type];
     return getter(elements);
   }
   __name(getSelectorsByType, "getSelectorsByType");
@@ -32509,7 +32540,7 @@
   __name(getSelectorsList, "getSelectorsList");
   function getSelectorsToGet(options) {
     const { selectors, includeTag } = options;
-    const selectors_to_get = [].concat(selectors);
+    const selectors_to_get = [...selectors];
     if (includeTag && !selectors_to_get.includes("tag")) {
       selectors_to_get.push("tag");
     }
@@ -32536,7 +32567,7 @@
     const data = {};
     selector_types.forEach((selector_type) => {
       const selector_variants = selectors_by_type[selector_type];
-      if (selector_variants.length > 0) {
+      if (selector_variants && selector_variants.length > 0) {
         data[selector_type] = selector_variants;
       }
     });
@@ -32568,10 +32599,10 @@
   }
   __name(generateCandidates, "generateCandidates");
   function getSelectorWithinRoot(elements, root2, rootSelector = "", options) {
-    const elementSelectors = getAllSelectors(elements, options.root, options);
+    const elementSelectors = getAllSelectors(elements, root2, options);
     const selectorCandidates = generateCandidates(elementSelectors, rootSelector);
     for (const candidateSelector of selectorCandidates) {
-      if (testSelector(elements, candidateSelector, options.root)) {
+      if (testSelector(elements, candidateSelector, root2)) {
         return candidateSelector;
       }
     }
@@ -32634,7 +32665,8 @@
     }
     let selector = "";
     pattern.forEach((selectorType) => {
-      const selectorsOfType = selectors[selectorType] || [];
+      var _a2;
+      const selectorsOfType = (_a2 = selectors[selectorType]) !== null && _a2 !== void 0 ? _a2 : [];
       selectorsOfType.forEach(({ value, include }) => {
         if (include) {
           selector += value;
@@ -32665,10 +32697,12 @@
 
   // ../../node_modules/css-selector-generator/esm/index.js
   function getCssSelector(needle, custom_options = {}) {
+    var _a2;
     const elements = sanitizeSelectorNeedle(needle);
     const options = sanitizeOptions(elements[0], custom_options);
+    const root2 = (_a2 = options.root) !== null && _a2 !== void 0 ? _a2 : getRootNode2(elements[0]);
     let partialSelector = "";
-    let currentRoot = options.root;
+    let currentRoot = root2;
     function updateIdentifiableParent() {
       return getClosestIdentifiableParent(elements, currentRoot, partialSelector, options);
     }
@@ -32676,7 +32710,7 @@
     let closestIdentifiableParent = updateIdentifiableParent();
     while (closestIdentifiableParent) {
       const { foundElements, selector } = closestIdentifiableParent;
-      if (testSelector(elements, selector, options.root)) {
+      if (testSelector(elements, selector, root2)) {
         return selector;
       }
       currentRoot = foundElements[0];
@@ -32966,20 +33000,23 @@
      * i.e - playwright can point at a parent button if element is a child of it
      */
     addOptionalParentSelector(useTextContent, addCSSSelectorGenerator, expandCSSKeyElements) {
-      const playwright = getElementWindowPlaywright(this.targetElement);
-      const playwrightTargetElement = playwright.locator(
-        playwright.selector(this.targetElement)
-      ).element;
-      if (playwrightTargetElement !== this.targetElement && playwrightTargetElement?.contains(this.targetElement)) {
-        return this.generate(playwrightTargetElement, [], {
-          isPartOfListItem: false,
-          isForContextElement: false,
-          useTextContent,
-          addCSSSelectorGenerator,
-          expandCSSKeyElements
-        });
+      try {
+        const playwright = getElementWindowPlaywright(this.targetElement);
+        const playwrightTargetElement = playwright.locator(
+          playwright.selector(this.targetElement)
+        ).element;
+        if (playwrightTargetElement !== this.targetElement && playwrightTargetElement?.contains(this.targetElement)) {
+          return this.generate(playwrightTargetElement, [], {
+            isPartOfListItem: false,
+            isForContextElement: false,
+            useTextContent,
+            addCSSSelectorGenerator,
+            expandCSSKeyElements
+          });
+        }
+      } finally {
+        return [];
       }
-      return [];
     }
     /**
      * Add CSS key features to the element chain, based on attributes that are not covered by playwright selectors
@@ -33162,7 +33199,7 @@
      */
     getLocatorBase(element) {
       const playwright = getElementWindowPlaywright(element);
-      if (this.rootNode === document) {
+      if (this.rootNode === document || this.rootNode.nodeType === 9) {
         return playwright;
       }
       return playwright.locator(playwright.selector(this.rootNode));
@@ -34252,16 +34289,16 @@
       this.overrideDialog("confirm" /* Confirm */);
       this.overrideDialog("prompt" /* Prompt */);
     }
-    overrideDialog(type) {
-      const orig = window[type].bind(window);
-      window[type] = (message) => {
-        const dialogResult = orig(message);
-        const dialogAction = this.determineDialogAction(dialogResult, type);
+    overrideDialog(dialogType) {
+      const orig = window[dialogType].bind(window);
+      window[dialogType] = (dialogMessage) => {
+        const dialogResult = orig(dialogMessage);
+        const dialogAction = this.determineDialogAction(dialogResult, dialogType);
         this.sessionRecorder.addCustomEvent(
           "native-dialog-event" /* NativeDialogEvent */,
           {
-            dialogType: type,
-            message,
+            dialogType,
+            dialogMessage,
             dialogResult,
             dialogAction
           }
@@ -34284,10 +34321,12 @@
 
   // ../browser-lib/src/element-inspector/element-inspector.ts
   var ElementInspector = class _ElementInspector {
-    constructor(rootDocument = document, defaultView, topLevelInspector) {
-      this.rootDocument = rootDocument;
-      this.defaultView = defaultView;
-      this.topLevelInspector = topLevelInspector;
+    constructor({
+      rootDocument = document,
+      getRenderDocument = /* @__PURE__ */ __name((defaultView2) => void 0, "getRenderDocument"),
+      defaultView,
+      topLevelInspector
+    } = {}) {
       this.wasHoveredElementSelected = false;
       this.selected = [];
       this.singleSelection = true;
@@ -34328,28 +34367,29 @@
             capture: true
           });
         }
-        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(
-          targetElement
-        );
+        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(targetElement).catch((error) => {
+          return {
+            locator: "",
+            selector: "",
+            parentFramesSelectors: []
+          };
+        });
         elementHighlighter.highlightElement(targetElement, {
           text: locator.replace("frameLocator('iframe').", ""),
           textPosition: "below",
           textWidthType: "auto",
           pointerEvents: "none",
           classNames: ["element-inspector-ignore"],
-          renderDocument: this.defaultView.top.document
+          renderDocument: this.getRenderDocument(this.defaultView)
         });
-        const elementByLocator = await this.playwrightElementSelectorGenerator.selector(
-          selector,
-          parentFramesSelectors
-        );
+        const elementByLocator = await this.playwrightElementSelectorGenerator.selector(selector, parentFramesSelectors).catch(() => targetElement);
         if (elementByLocator !== target) {
           elementHighlighter.highlightElement(elementByLocator, {
             // highlightStyle: { outlineColor: "blue" },
             clear: false,
             pointerEvents: "none",
             classNames: ["element-inspector-ignore"],
-            renderDocument: this.defaultView.top.document
+            renderDocument: this.getRenderDocument(this.defaultView)
           });
         }
         this.hoveredElement = targetElement;
@@ -34386,11 +34426,12 @@
           }
           this.stopSubDocumentInspector(true);
         }
-        this.subDocumentInspector = new _ElementInspector(
-          newRootDocument,
+        this.subDocumentInspector = new _ElementInspector({
+          rootDocument: newRootDocument,
           defaultView,
-          this.topLevelInspector ?? this
-        );
+          topLevelInspector: this.topLevelInspector ?? this,
+          getRenderDocument: this.getRenderDocument
+        });
         this.subDocumentInspector.start(this.singleSelection);
         return true;
       }, "handleSubDocument");
@@ -34400,13 +34441,17 @@
           this.subDocumentInspector = null;
         }
       }, "stopSubDocumentInspector");
+      this.rootDocument = rootDocument;
+      this.topLevelInspector = topLevelInspector;
+      this.getRenderDocument = getRenderDocument;
+      this.defaultView = defaultView ?? this.getDefaultView();
       this.playwrightElementSelectorGenerator = new PlaywrightElementSelectorGenerator();
-      if (!defaultView) {
-        this.defaultView = this.rootDocument.nodeType === Node.DOCUMENT_NODE ? this.rootDocument.defaultView : window;
-      }
     }
     static {
       __name(this, "ElementInspector");
+    }
+    getDefaultView() {
+      return this.rootDocument.nodeType === Node.DOCUMENT_NODE ? this.rootDocument.defaultView : window;
     }
     start(singleSelection = true) {
       this.singleSelection = singleSelection;
@@ -34582,7 +34627,9 @@ ${data.locator}`
       });
     }
     startObserver() {
-      this.elementInspector = new ElementInspector(window.document);
+      this.elementInspector = new ElementInspector({
+        rootDocument: window.document
+      });
       this.elementInspector.start();
       this.enableEventsFilter();
     }
@@ -36000,10 +36047,11 @@ ${data.locator}`
     // -------- [Native Dialog] -------- //
     handleNativeDialog(data, event) {
       try {
-        const { dialogAction, dialogType, dialogResult } = data;
+        const { dialogAction, dialogType, dialogResult, dialogMessage } = data;
         const nativeDialog = {
           dialogResult,
-          dialogType
+          dialogType,
+          dialogMessage
         };
         const action = this.makePageAction(
           dialogAction,
@@ -36021,7 +36069,7 @@ ${data.locator}`
     // -------- [Assertions] -------- //
     handleRecordAssertion(data, event) {
       this.addStep({
-        step: this.makeAssertion(data),
+        step: this.makeAssertion(data, event),
         type: "assertion" /* Assertion */
       });
     }
@@ -36124,11 +36172,12 @@ ${data.locator}`
       this.lastInteractionEventIndex = this.events.length;
       this.onStep?.(step);
     }
-    makeAssertion(data) {
+    makeAssertion(data, event) {
       return {
         matcher: data.matcher,
         locator: data.locator,
         thought: data.thought,
+        timestamp: event.timestamp,
         id: data?.id || Date.now().toString()
       };
     }
@@ -36233,9 +36282,16 @@ ${data.locator}`
       this.sendRecordedSteps = sendRecordedSteps;
     }
     startInspector(singleSelection = true, rootDocument) {
-      this.elementInspector = new ElementInspector(
-        rootDocument ?? this.getRRwebReplayerDocument()
-      );
+      this.stopInspector();
+      const getRenderDocument = /* @__PURE__ */ __name((defaultView) => {
+        return defaultView.top.document.querySelector(
+          "iframe.time-machine-iframe"
+        ).contentDocument;
+      }, "getRenderDocument");
+      this.elementInspector = new ElementInspector({
+        rootDocument: rootDocument ?? this.getRRwebReplayerDocument(),
+        getRenderDocument
+      });
       this.elementInspector.start(singleSelection);
     }
     getRRwebReplayerDocument() {
