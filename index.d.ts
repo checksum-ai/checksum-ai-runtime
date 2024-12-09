@@ -19,7 +19,7 @@ interface ChecksumAIMethod {
 
 type EnumValues<T> = T[keyof T];
 
-export interface IVariablesStore {
+export interface IVariableStore {
   [key: string]: any;
 }
 
@@ -279,8 +279,9 @@ export function getChecksumConfig(
 
 type ChecksumPlaywrightTestArgs = Omit<PlaywrightTestArgs, "page"> & {
   page: IChecksumPage;
-  variablesStore: IVariablesStore;
-  vs: IVariablesStore;
+  variablesStore: IVariableStore;
+  variableStore: IVariableStore;
+  vs: IVariableStore;
 };
 
 type ChecksumTestType<TestArgs> = TestType<
