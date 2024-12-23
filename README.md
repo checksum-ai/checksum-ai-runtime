@@ -17,6 +17,41 @@
 2. We recommend using a consistent seeded user for every test. For example, before each test, call a webhook that creates a user, seeds it with data, and returns the username and password. This approach ensures test reliability and allows parallel test execution. Configure this webhook [in your project](https://app.checksum.ai/#/settings/wizard) for consistent test generation.
 3. After logging in, assert that the login was successful. Playwright waits for assertions to be correct, ensuring that the page is ready for interaction before proceeding.
 4. To reuse authentication states between tests, refer to the Playwright guide on [authentication](https://playwright.dev/docs/auth). At the start of the login function, check if the user is already authenticated and return if so.
+5. Use the ChecksumLoginFunction type to correctly implement the login function, as following
+   ```
+    import {
+      ChecksumLoginFunction,
+      ChecksumConfigEnvironment,
+      EnvironmentUser,
+      ChecksumConfig
+    } from "@checksum-ai/runtime"
+    
+    const login: ChecksumLoginFunction<PayloadType> = async (
+      page,
+      {
+        environment, /* selected environment */
+        user, /* selected user */
+        config /* loaded config from checksum.config.ts */,
+        payload /* allowing externally provided payload */
+      }: {
+        environment: ChecksumConfigEnvironment,
+        user: EnvironmentUser,
+        config: ChecksumConfig,
+        payload: PayloadType
+      }
+    ): Promise<void> => {
+      const email = user.username;
+      const password = user.password;
+      const token = payload.token;
+      const url = environment.baseURL;
+      await page.goto(url);
+      ...
+      console.log("Login Successful");
+      return;
+    };
+
+    exports.default = login;
+   ```
 
 ## Checksum AI Magic
 
@@ -166,7 +201,10 @@ function init(base: ChecksumTestType<PlaywrightTestArgs>): {
   /**
    * The login method which calls the user defined login function
    */
-  login: ReturnType<typeof getLogin>;
+  login: (
+    page: Page,
+    { role, environment }?: { role?: string; environment?: string }
+  ) => Promise<void>;
   /**
    * The test title definition along with the test id
    * used by Checksum to identify the test
@@ -195,7 +233,10 @@ function init(base: ChecksumTestType<PlaywrightTestArgs>): {
   }) => {
     environment: ChecksumConfigEnvironment;
     user: EnvironmentUser;
-    login: ReturnType<typeof getLogin>;
+    login: (
+      page: Page,
+      { role }?: { role?: string }
+    ) => Promise<void>;
   };
 };
 ```

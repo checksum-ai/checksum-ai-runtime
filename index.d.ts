@@ -22,6 +22,8 @@ type EnumValues<T> = T[keyof T];
 export interface IVariableStore {
   [key: string]: any;
 }
+// backward compatibility
+export type IVariablesStore = IVariableStore;
 
 type ModifyLocatorMethodToChecksumLocator<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => Locator // Check if the property is a function returning Locator
@@ -219,33 +221,8 @@ export type ChecksumConfig = {
    * Checksum API key
    */
   apiKey: string;
-  /**
-   * Base URL of the tested app (i.e http://staging.example.com)
-   */
-  baseURL: string;
 
   environments?: ChecksumConfigEnvironment[];
-
-  /**
-   * The username/email that will be used
-   * to login into your testing environment
-   */
-  username?: string;
-  /**
-   * The password that will be used
-   * to login into your testing environment
-   */
-  password?: string;
-
-  /**
-   * The credentials of the users that will be used to login into your testing environment
-   */
-  users?: {
-    role: string;
-    username?: string;
-    password?: string;
-    default?: boolean;
-  }[];
 
   /**
    * Checksum runtime options
@@ -267,6 +244,18 @@ export type EnvironmentUser = {
   password?: string;
   default?: boolean;
 };
+
+export type ChecksumLoginFunctionParams<PayloadType = any> = {
+  environment: ChecksumConfigEnvironment;
+  user: EnvironmentUser;
+  config: ChecksumConfig;
+  payload?: PayloadType;
+};
+
+export type ChecksumLoginFunction<PayloadType = any> = (
+  page: IChecksumPage,
+  params: ChecksumLoginFunctionParams<PayloadType>
+) => Promise<void>;
 
 export function getLogin(): (
   page: Page,
