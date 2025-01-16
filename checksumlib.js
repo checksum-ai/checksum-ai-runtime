@@ -7509,6 +7509,9 @@
     return null;
   }, "closestExtended");
   var childNodesExtended = /* @__PURE__ */ __name((node2, { flattenShadowRootChildren = false } = {}) => {
+    if (!node2) {
+      return [];
+    }
     let childNodes2 = Array.from(node2.childNodes);
     if (node2.nodeType === Node.ELEMENT_NODE) {
       const element = node2;
@@ -7579,7 +7582,12 @@
     }
     return null;
   }, "parentElementExtended");
-  var serializeElement = /* @__PURE__ */ __name((element, { includeComments = true, includeCDATA = true, trim = true } = {}) => {
+  var serializeElement = /* @__PURE__ */ __name((element, {
+    includeComments = true,
+    includeCDATA = true,
+    trim = true,
+    limitAttributeLength = false
+  } = {}) => {
     if (!element) {
       return "";
     }
@@ -7588,7 +7596,7 @@
         case Node.ELEMENT_NODE:
           return serializeElementNode2(node2);
         case Node.TEXT_NODE:
-          return trim ? node2.nodeValue.trim() : node2.nodeValue;
+          return node2.nodeValue;
         case Node.CDATA_SECTION_NODE:
           return includeCDATA ? `<![CDATA[${node2.nodeValue}]]>` : "";
         case Node.COMMENT_NODE:
@@ -7615,7 +7623,11 @@
       let tagName = element2.tagName.toLowerCase();
       let serialized = `<${tagName}`;
       Array.from(element2.attributes).forEach((attr) => {
-        serialized += ` ${attr.name}="${attr.value}"`;
+        const attributeValue = attr.value.slice(
+          0,
+          limitAttributeLength ? 100 : void 0
+        );
+        serialized += ` ${attr.name}="${attributeValue}"`;
       });
       serialized += ">";
       if (element2.shadowRoot) {
@@ -29400,52 +29412,14 @@
 
   // ../browser-lib/src/session-record-replay/session-replayer.ts
   var import_await_sleep3 = __toESM(require_await_sleep());
+  var DEBUG_MODE = false;
   var SessionReplayer = class {
     constructor(config = {}) {
-      this.events = [];
-      this.numberOfCastedEvents = 0;
-      this.isLive = true;
-      this.liveEvents = [];
-      // private currentTraveledTimestamp: number = undefined;
-      this.currentTraveledNumberOfEvents = void 0;
+      // array of events to init replayer
+      this.eventsBuffer = [];
       this.config = {
         enableInteract: false
       };
-      this.useTimestampCompression = true;
-      // getCurrentTraveledTimestamp = () => {
-      //   return this.isLive ? undefined : this.currentTraveledTimestamp;
-      // };
-      this.fastForward = /* @__PURE__ */ __name(async (newEvents, force = false) => {
-        let sortedNewEvents = newEvents.sort(
-          (e1, e2) => this.getOriginalTimestamp(e1) - this.getOriginalTimestamp(e2)
-        );
-        if (this.useTimestampCompression) {
-          const timestamp = Date.now();
-          sortedNewEvents = sortedNewEvents.map((event, eventIndex) => ({
-            ...event,
-            timestamp: timestamp + eventIndex,
-            originalTimestamp: this.getOriginalTimestamp(event)
-          }));
-        }
-        if (!force && !this.isLive) {
-          this.liveEvents.push(...sortedNewEvents);
-          return;
-        }
-        this.events = [...this.events, ...sortedNewEvents];
-        const promise = new Promise((resolve2) => {
-          this.onEventCast = (event) => {
-            this.numberOfCastedEvents++;
-            if (this.numberOfCastedEvents === this.events.length) {
-              this.onEventCast = void 0;
-              resolve2();
-            }
-          };
-        });
-        for (const event of sortedNewEvents) {
-          this.replayer.addEvent(event);
-        }
-        return promise;
-      }, "fastForward");
       this.stop = /* @__PURE__ */ __name(() => {
         try {
           if (this.replayer) {
@@ -29455,234 +29429,146 @@
           console.warn("Error destroying replayer", e2);
         }
       }, "stop");
-      this.getOriginalTimestamp = /* @__PURE__ */ __name((event) => {
-        return event.originalTimestamp ?? event.timestamp;
-      }, "getOriginalTimestamp");
-      this.trimEventsToLastCheckout = /* @__PURE__ */ __name((events) => {
-        const lastCheckoutEventIndex = events.reduce(
-          (lastCheckoutEventIndex2, event, index2) => {
-            return event.isCheckout && event.type === EventType.Meta ? index2 : lastCheckoutEventIndex2;
-          },
-          void 0
-        );
-        let trimmedEvents = events;
-        if (lastCheckoutEventIndex !== void 0) {
-          trimmedEvents = events.slice(lastCheckoutEventIndex);
-        }
-        const castedEvents = lastCheckoutEventIndex !== void 0 ? this.liveEvents.slice(0, lastCheckoutEventIndex) : [];
-        return { trimmedEvents, castedEvents, lastCheckoutEventIndex };
-      }, "trimEventsToLastCheckout");
       this.getNodeById = /* @__PURE__ */ __name((id) => {
         return this.replayer.getMirror().getNode(id);
       }, "getNodeById");
       this.getMeta = /* @__PURE__ */ __name((node2) => {
-        return this.replayer.getMirror().getMeta(node2);
+        return this.replayer?.getMirror()?.getMeta(node2);
       }, "getMeta");
+      // store each event for debug and check ids of events and timestamps, if one exists
+      this.debugData = {
+        active: false,
+        events: [],
+        castedEvents: []
+      };
       this.config = { ...this.config, ...config };
-      this.goBackWithEvents = this.goBackWithEvents_native;
     }
     static {
       __name(this, "SessionReplayer");
     }
-    makeReplayerConfig(live, { speed = 8 } = {}) {
+    makeReplayerConfig() {
       const playerConfig = {
         mouseTail: false,
         pauseAnimation: false,
-        speed,
+        speed: 64,
         triggerFocus: true,
         UNSAFE_replayCanvas: true,
-        liveMode: live,
+        liveMode: true,
         showDebug: false,
-        skipInactive: true,
-        inactivePeriodThreshold: 100
+        skipInactive: true
+        // inactivePeriodThreshold: 100,
       };
       if (this.config.root) {
         playerConfig.root = this.config.root;
       }
       return playerConfig;
     }
-    makeReplayer(events, live, { speed = 8 } = {}) {
-      this.replayer = new Replayer(
-        events,
-        this.makeReplayerConfig(live, { speed })
-      );
+    // function to create replayer (should be called once)
+    makeReplayer(events = [], { baselineTime = Date.now() } = {}) {
+      this.replayer = new Replayer(events, this.makeReplayerConfig());
       if (this.config.enableInteract) {
         this.replayer.enableInteract();
       } else {
-        this.replayer.disableInteract();
+        this.replayer?.disableInteract();
       }
-    }
-    start(options, castedEvents = []) {
-      this.startOptions = options;
-      const {
-        firstEventTimestamp,
-        speed = 8,
-        useTimestampCompression = true
-      } = options;
-      this.events = castedEvents;
-      this.numberOfCastedEvents = castedEvents.length;
-      this.makeReplayer([], true, { speed });
-      this.useTimestampCompression = useTimestampCompression;
-      this.replayer.startLive(
-        this.useTimestampCompression ? Date.now() : firstEventTimestamp
-      );
-      this.replayer.on("event-cast", (event) => {
+      if (this.config.onlyLive) {
+        this.replayer.startLive(baselineTime);
+      } else {
+        this.replayer.play();
+      }
+      this.firstEvent = events[0];
+      if (DEBUG_MODE) {
+        this.setupDebugMode();
+      }
+      this.replayer.on(ReplayerEvents.EventCast, (event) => {
+        this.storeCastedEvent(event);
         if (this.onEventCast) {
           this.onEventCast(event);
         }
       });
     }
-    async goLive(sleepAfter = 1e3) {
-      if (this.isLive) {
-        console.log("Already live, nothing to do.");
-        return;
-      }
-      console.log("Going live...");
-      this.stop();
-      this.currentTraveledNumberOfEvents = void 0;
-      const { trimmedEvents, castedEvents } = this.trimEventsToLastCheckout(
-        this.liveEvents
-      );
-      this.start(
-        {
-          ...this.startOptions,
-          firstEventTimestamp: castedEvents.length ? castedEvents[0].timestamp : trimmedEvents[0].timestamp
-        },
-        castedEvents
-      );
-      this.isLive = true;
-      await this.fastForward(trimmedEvents);
-      if (sleepAfter) {
-        await (0, import_await_sleep3.default)(sleepAfter);
-      }
-    }
-    async goBackWithEvents_native(getEvents2, { sleepAfter = 1e3 }) {
-      if (this.isLive) {
-        this.liveEvents = this.events;
-      }
-      const events = getEvents2();
-      if (events.length === this.currentTraveledNumberOfEvents || events.length < 2) {
-        return;
-      }
-      this.stop();
-      this.events = [];
-      this.numberOfCastedEvents = 0;
-      this.isLive = false;
-      this.currentTraveledNumberOfEvents = events.length;
-      const { trimmedEvents } = this.trimEventsToLastCheckout(events);
-      if (trimmedEvents.length < 2) {
-        console.log("trimmedEvents.length is less than 2");
-        return;
-      }
-      this.makeReplayer(trimmedEvents, false, { speed: 360 });
-      this.replayer.play(trimmedEvents[trimmedEvents.length - 1].timestamp);
-      if (sleepAfter) {
-        await (0, import_await_sleep3.default)(sleepAfter);
-      }
-    }
-    async goBackWithEvents_native2(getEvents2, { sleepAfter = 1e3 }) {
-      try {
-        const events = getEvents2();
-        const targetTimestamp = events[events.length - 1]?.timestamp ?? 0;
-        const getTimeForPause = /* @__PURE__ */ __name(() => {
-          return targetTimestamp - (this.events[0].timestamp ?? 0);
-        }, "getTimeForPause");
-        if (!this.isLive && targetTimestamp <= this.events[this.events.length - 1].timestamp) {
-          const timeForPause2 = getTimeForPause();
-          this.replayer.pause(timeForPause2);
-          return;
+    seek(ts, pause = true) {
+      return new Promise((resolve2) => {
+        const delta = ts - this.firstEvent.timestamp;
+        this.replayer.play(delta);
+        if (pause) {
+          setTimeout(() => {
+            this.replayer?.pause();
+            resolve2();
+          }, 0);
+        } else {
+          resolve2();
         }
-        if (this.isLive) {
-          this.liveEvents = this.events;
-        }
-        this.stop();
-        this.events = this.liveEvents;
-        this.numberOfCastedEvents = this.liveEvents.length;
-        this.isLive = false;
-        this.makeReplayer(this.events, false, { speed: 360 });
-        const timeForPause = getTimeForPause();
-        this.replayer.pause(timeForPause);
-      } finally {
-        if (sleepAfter) {
-          await (0, import_await_sleep3.default)(sleepAfter);
+      });
+    }
+    start(options, castedEvents = []) {
+    }
+    // receives new events, and adds them to replayer
+    async fastForward(events) {
+      if (!this.replayer) {
+        if (this.config.onlyLive) {
+          this.makeReplayer([], { baselineTime: events[0].timestamp });
+        } else {
+          this.eventsBuffer.push(...events);
+          if (this.eventsBuffer.length > 2) {
+            this.makeReplayer(this.eventsBuffer);
+          } else {
+            return;
+          }
         }
       }
+      let numberOfCastedEvents = 0;
+      const promise = new Promise((resolve2) => {
+        this.onEventCast = () => {
+          numberOfCastedEvents++;
+          if (numberOfCastedEvents === events.length) {
+            this.onEventCast = void 0;
+            resolve2();
+          }
+        };
+      });
+      for (const event of events) {
+        if (event.type === EventType.FullSnapshot) {
+          this.lastSnapshot = event;
+        }
+        this.replayer.addEvent(event);
+        this.lastEvent = event;
+        this.storeEvent(event);
+      }
+      return promise;
     }
-    async goBackWithEvents_FFwd(getEvents2, { sleepAfter = 1e3 }) {
-      if (this.isLive) {
-        this.liveEvents = this.events;
-      }
-      const events = getEvents2();
-      if (events.length === this.currentTraveledNumberOfEvents) {
-        return;
-      }
-      this.currentTraveledNumberOfEvents = events.length;
-      this.stop();
-      const { trimmedEvents, castedEvents } = this.trimEventsToLastCheckout(
-        this.liveEvents
-      );
-      this.start(this.startOptions, castedEvents);
-      this.isLive = false;
-      await this.fastForward(trimmedEvents, true);
-      if (sleepAfter) {
-        await (0, import_await_sleep3.default)(sleepAfter);
-      }
+    async goLive() {
+      await this.seek(this.lastEvent.timestamp, false);
+      await (0, import_await_sleep3.default)(1e3);
     }
     async goBack(timestamp, {
       sleepAfter = 1e3,
       beforeTimestamp = false,
       includeAllMatchingTimestamps = false
     } = {}) {
-      const getEvents2 = /* @__PURE__ */ __name(() => {
-        const indexOfFirstEventWithLargerOrEqualTimestamp = this.liveEvents.findIndex(
-          (e2) => this.getOriginalTimestamp(e2) >= timestamp
-        );
-        const firstEventWithLargerOrEqualTimestamp = this.liveEvents[indexOfFirstEventWithLargerOrEqualTimestamp];
-        if (indexOfFirstEventWithLargerOrEqualTimestamp === -1) {
-          return this.liveEvents;
-        }
-        if (beforeTimestamp || this.getOriginalTimestamp(firstEventWithLargerOrEqualTimestamp) > timestamp) {
-          return this.liveEvents.slice(
-            0,
-            indexOfFirstEventWithLargerOrEqualTimestamp
-          );
-        }
-        if (!includeAllMatchingTimestamps) {
-          return this.liveEvents.slice(
-            0,
-            indexOfFirstEventWithLargerOrEqualTimestamp + 1
-          );
-        }
-        let sliceIndex = indexOfFirstEventWithLargerOrEqualTimestamp + 1;
-        while (sliceIndex < this.liveEvents.length && this.getOriginalTimestamp(this.liveEvents[sliceIndex]) === timestamp) {
-          sliceIndex++;
-        }
-        return this.liveEvents.slice(
-          0,
-          indexOfFirstEventWithLargerOrEqualTimestamp
-        );
-      }, "getEvents");
-      return this.goBackWithEvents(getEvents2, {
-        sleepAfter
-      });
-    }
-    async getLastEventTimestamps(snapshot2 = false) {
-      const lastEvent = snapshot2 ? await this.findLastFullSnapshotEvent() : this.events[this.events.length - 1];
-      return {
-        timestamp: lastEvent?.timestamp,
-        originalTimestamp: lastEvent?.originalTimestamp
-      };
-    }
-    async findLastFullSnapshotEvent() {
-      const event = this.events.reduce((snapshotEvent, event2) => {
-        return event2.type === EventType.FullSnapshot ? event2 : snapshotEvent;
-      }, void 0);
-      if (event) {
-        return event;
-      }
-      console.log("waiting for full snapshot event...");
+      await this.seek(timestamp, true);
       await (0, import_await_sleep3.default)(1e3);
-      return this.findLastFullSnapshotEvent();
+    }
+    storeEvent(event) {
+      if (!this.debugData.active) {
+        return;
+      }
+      this.debugData.events.push(event);
+    }
+    storeCastedEvent(event) {
+      if (!this.debugData.active) {
+        return;
+      }
+      this.debugData.castedEvents.push(event);
+    }
+    setupDebugMode() {
+      this.debugData.active = true;
+      window.__chkreplayer = {
+        events: /* @__PURE__ */ __name(() => this.debugData.events, "events"),
+        back: /* @__PURE__ */ __name((ts) => this.goBack(ts, {}), "back"),
+        currentTime: /* @__PURE__ */ __name(() => this.replayer.getCurrentTime(), "currentTime"),
+        castedEvents: /* @__PURE__ */ __name(() => this.debugData.castedEvents, "castedEvents")
+      };
     }
   };
 
@@ -31746,204 +31632,6 @@
   };
   var elementHighlighter = new ElementHighlighter();
 
-  // ../browser-lib/src/storage/indexedDB.ts
-  var IndexedDBClient = class {
-    constructor(rawDbName, storeName) {
-      this.rawDbName = rawDbName;
-      this.storeName = storeName;
-      this.db = null;
-    }
-    static {
-      __name(this, "IndexedDBClient");
-    }
-    getDBName() {
-      if (!this._dbName) {
-        if (!window.name) {
-          const tabIndex = window.sessionStorage.getItem("nextTabIndex") ?? "0";
-          window.name = tabIndex;
-          window.sessionStorage.setItem(
-            "nextTabIndex",
-            `${parseInt(tabIndex) + 1}`
-          );
-        }
-        this._dbName = `${this.rawDbName}-${window.name}`;
-      }
-      return this._dbName;
-    }
-    open(version = 1) {
-      return new Promise((resolve2, reject) => {
-        const request = indexedDB.open(this.getDBName(), version);
-        request.onupgradeneeded = (event) => {
-          this.db = request.result;
-          if (!this.db.objectStoreNames.contains(this.storeName)) {
-            this.db.createObjectStore(this.storeName);
-          }
-        };
-        request.onsuccess = (event) => {
-          this.db = request.result;
-          resolve2(this.db);
-        };
-        request.onerror = (event) => {
-          console.log("IndexedDBClient.open() error", event, request.error);
-          reject(request.error);
-        };
-      });
-    }
-    count() {
-      return new Promise((resolve2, reject) => {
-        if (!this.db) {
-          reject("Database has not been initialized");
-          return;
-        }
-        const transaction = this.db.transaction([this.storeName]);
-        const store = transaction.objectStore(this.storeName);
-        const request = store.count();
-        request.onsuccess = () => resolve2(request.result);
-        request.onerror = () => {
-          return reject(request.error);
-        };
-      });
-    }
-    set(data, key) {
-      return new Promise((resolve2, reject) => {
-        if (!this.db) {
-          reject("Database has not been initialized");
-          return;
-        }
-        const transaction = this.db.transaction([this.storeName], "readwrite");
-        const store = transaction.objectStore(this.storeName);
-        const request = store.add(data, key);
-        request.onsuccess = () => resolve2();
-        request.onerror = () => {
-          return reject(request.error);
-        };
-      });
-    }
-    get(multiple, query, count) {
-      return new Promise((resolve2, reject) => {
-        if (!this.db) {
-          reject("Database has not been initialized");
-          return;
-        }
-        const transaction = this.db.transaction([this.storeName]);
-        const store = transaction.objectStore(this.storeName);
-        const request = multiple ? store.getAll(query, count) : store.get(query);
-        request.onsuccess = () => resolve2(request.result);
-        request.onerror = () => {
-          return reject(request.error);
-        };
-      });
-    }
-    getOne(query) {
-      return this.get(false, query);
-    }
-    getAll(query, count) {
-      return this.get(true, query, count);
-    }
-  };
-
-  // ../browser-lib/src/rrweb-events-storage-manager/rrweb-events-storage-manager.ts
-  var RrwebEventsStorageManager = class {
-    constructor() {
-      this.initialized = false;
-      this.rrwebEventsLoaded = false;
-      this.loadRRwebEvents = [];
-      this.rrwebCrossFrameEventIdCounter = 0;
-      this.firstRequestedIndex = void 0;
-    }
-    static {
-      __name(this, "RrwebEventsStorageManager");
-    }
-    async initRRwebEvents() {
-      try {
-        if (this.initialized) {
-          console.warn(
-            "[RrwebEventsStorageManager] initRRwebEvents called more than once"
-          );
-          return;
-        }
-        this.initialized = true;
-        this.rrwebEventsIndexedDB = new IndexedDBClient(
-          "checksum",
-          "rrwebEvents"
-        );
-        try {
-          await this.rrwebEventsIndexedDB.open();
-        } catch (e2) {
-          return;
-        }
-        this.rrwebCrossFrameEventIdCounter = await this.rrwebEventsIndexedDB.count();
-        this.loadRRwebEvents.forEach((event) => {
-          this.rrwebEventsIndexedDB.set(
-            event,
-            this.rrwebCrossFrameEventIdCounter++
-          );
-        });
-        this.rrwebEventsLoaded = true;
-      } catch (e2) {
-        console.log(e2);
-      }
-    }
-    onRRwebEvent(event) {
-      if (this.rrwebEventsLoaded) {
-        this.rrwebEventsIndexedDB.set(
-          event,
-          this.rrwebCrossFrameEventIdCounter++
-        );
-      } else {
-        this.loadRRwebEvents.push(event);
-      }
-    }
-    isInitialized() {
-      return this.initialized;
-    }
-    getLastRRwebEventKey() {
-      return this.rrwebCrossFrameEventIdCounter - 1;
-    }
-    /**
-     * Performs an HTTP post with the JSON of the rrweb events array to a given URL.
-     */
-    async postRRwebEvents(url) {
-      if (!this.rrwebEventsLoaded) {
-        return [];
-      }
-      const rrwebEvents = await this.rrwebEventsIndexedDB.getAll();
-      return fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(rrwebEvents)
-      });
-    }
-    async getRRwebEvents(lowerBoundKey, size) {
-      try {
-        if (this.firstRequestedIndex === void 0) {
-          this.firstRequestedIndex = lowerBoundKey;
-        }
-        lowerBoundKey -= this.firstRequestedIndex;
-        if (!this.rrwebEventsLoaded) {
-          return [];
-        }
-        const bound = size ? IDBKeyRange.bound(lowerBoundKey, lowerBoundKey + size) : IDBKeyRange.lowerBound(lowerBoundKey);
-        const events = await this.rrwebEventsIndexedDB.getAll(
-          bound
-        );
-        return events;
-      } catch (e2) {
-        console.log(e2);
-        return [];
-      }
-    }
-    async getRRwebEvent(key) {
-      if (!this.rrwebEventsLoaded) {
-        return null;
-      }
-      return this.rrwebEventsIndexedDB.getOne(key);
-    }
-  };
-  var rrwebEventsStorageManager = new RrwebEventsStorageManager();
-
   // src/lib/test-generator/selectors/pw-injected-script-functions.js
   function escapeForTextSelector(text, exact) {
     if (typeof text !== "string") return escapeRegexForSelector(text);
@@ -32014,11 +31702,6 @@
     return selector.trim().replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
   }
   __name(escapeSelector, "escapeSelector");
-  function replaceLocatorQuotesWithTicks(str) {
-    const firstParantheses = str.indexOf("(");
-    return str.substring(0, firstParantheses + 1) + "`" + str.substring(firstParantheses + 2, str.length - 2) + "`)";
-  }
-  __name(replaceLocatorQuotesWithTicks, "replaceLocatorQuotesWithTicks");
   function getElementWindowPlaywright(node2) {
     const elementWindow = node2.ownerDocument.defaultView;
     if (elementWindow !== window && !elementWindow.playwright) {
@@ -32743,7 +32426,40 @@
   }, "guardReturn");
 
   // src/lib/test-generator/selectors/pw-custom-locator-generator.ts
-  var DEBUG_MODE = false;
+  var DEBUG_MODE2 = false;
+  var LocatorChain = class _LocatorChain {
+    constructor(locators) {
+      this.locators = [];
+      this.elements = [];
+      this.locators = locators;
+    }
+    static {
+      __name(this, "LocatorChain");
+    }
+    /**
+     * Check if any of the locators have the same filter values
+     * For now, we only check for hasText filter
+     */
+    hasDuplicateFilters() {
+      const hasTextFilters = this.locators.map((l2) => l2.options?.hasText).filter((value) => value);
+      return hasTextFilters.length !== new Set(hasTextFilters).size;
+    }
+    cloneAndAddCandidate(candidate) {
+      return new _LocatorChain([candidate, ...this.locators.slice()]);
+    }
+    toLocatorCandidate() {
+      return {
+        selector: this.getSelector(),
+        locator: this.getLocator()
+      };
+    }
+    getSelector() {
+      return this.locators.map((l2) => l2.selector).join(" >> ");
+    }
+    getLocator() {
+      return this.locators.map((l2) => l2.locator).join(".");
+    }
+  };
   var PlaywrightCustomLocatorGenerator = class _PlaywrightCustomLocatorGenerator {
     constructor(rootNode = document) {
       this.rootNode = rootNode;
@@ -32763,29 +32479,23 @@
      * @param cssKeyElements array of css key elements to use as selectors
      * @param options
      */
-    async generate(element, cssKeyElements = [], {
-      /**
-       * if element is part of a list - don't limit to 1 element,
-       * but verify that all returned elements are part of the same list
-       */
-      isPartOfListItem = false,
-      /**
-       * Generate a selector for context element.
-       * For context elements we should generate a simplistic selector that will not include text context from the page.
-       * For that reason we should not bubble up the DOM tree to find the best selector, but rather use the element itself.
-       * It can also return multiple elements.
-       */
-      isForContextElement = false,
-      /**
-       * Whether to use text content to generate selectors
-       * Useful to turn off when wanting to avoid page context in selectors like user data
-       **/
-      useTextContent = true,
-      /* Whether to add CSS selector from the css-selector-generator library */
-      addCSSSelectorGenerator = true,
-      /* Whether to heuristiically expand CSS key elements to include more selectors */
-      expandCSSKeyElements = true
-    } = {}) {
+    async generate(element, cssKeyElements = [], options = {}) {
+      const {
+        isPartOfListItem,
+        isForContextElement,
+        useTextContent,
+        addCSSSelectorGenerator,
+        expandCSSKeyElements,
+        bruteForceMode
+      } = {
+        isPartOfListItem: false,
+        isForContextElement: false,
+        useTextContent: true,
+        addCSSSelectorGenerator: true,
+        expandCSSKeyElements: true,
+        bruteForceMode: false,
+        ...options
+      };
       if (isNodeInstanceOf(element, "HTMLOptionElement")) {
         const select = element.closest("select");
         if (select) {
@@ -32794,10 +32504,9 @@
           });
         }
       }
-      this.usedFilters = { hasText: [], has: [] };
       this.targetElement = element;
       this.startTimestamp = Date.now();
-      const locatorsCandidates = [];
+      const locatorsChains = [];
       cssKeyElements = cssKeyElements.filter(
         (featureElement) => Array.from(document.querySelectorAll(featureElement.selector)).includes(
           featureElement.element
@@ -32807,70 +32516,78 @@
         this.expandCSSKeyFeatures(element, cssKeyElements);
       }
       while (element && element !== this.rootNode) {
-        const elementSelectors = this.getAllLocators(element, cssKeyElements, {
-          useTextContent
-        });
+        const elementCandidates = this.getAllLocators(
+          element,
+          cssKeyElements,
+          {
+            useTextContent,
+            bruteForceMode
+          }
+        );
         const validLocators = [];
-        const testSelector2 = /* @__PURE__ */ __name((selector) => {
+        const testCandidate = /* @__PURE__ */ __name((chain) => {
+          if (chain.hasDuplicateFilters()) {
+            return;
+          }
           try {
-            const { elements } = this.getLocatorBase(element).locator(selector);
-            if (elements.some((e2) => e2 === this.targetElement)) {
-              validLocators.push({
-                selector,
-                locator: this.getSelectorLocator(selector),
-                elements: elements.filter(
-                  (el) => isInstanceOfHTMLElement(el) || el.constructor.name === this.targetElement.constructor.name
-                )
-              });
+            const { elements } = this.getLocatorBase(element).locator(
+              chain.getSelector()
+            );
+            if (elements?.some((e2) => e2 === this.targetElement)) {
+              chain.elements = elements.filter(
+                (el) => isInstanceOfHTMLElement(el) || el.constructor.name === this.targetElement.constructor.name
+              ), validLocators.push(chain);
             }
           } catch (error) {
-            console.log(error);
+            console.log(error, chain.getSelector());
           }
-        }, "testSelector");
-        if (!locatorsCandidates.length) {
-          elementSelectors.forEach((selector) => testSelector2(selector));
+        }, "testCandidate");
+        if (!locatorsChains.length) {
+          elementCandidates.forEach(
+            (ec) => testCandidate(new LocatorChain([ec]))
+          );
         } else {
-          elementSelectors.forEach((elementSelector) => {
-            locatorsCandidates.forEach(
-              (sc) => testSelector2(`${elementSelector} >> ${sc.selector}`)
+          elementCandidates.forEach((ec) => {
+            locatorsChains.forEach(
+              (sc) => testCandidate(sc.cloneAndAddCandidate(ec))
             );
           });
         }
-        if (validLocators.length === 0 && locatorsCandidates.length === 0) {
+        if (validLocators.length === 0 && locatorsChains.length === 0) {
           const selector = element.tagName.toLowerCase();
-          locatorsCandidates.push({
-            selector,
-            locator: this.getSelectorLocator(selector),
-            elements: this.getLocatorBase(element).locator(element.tagName.toLowerCase()).elements.filter(
-              (el) => isInstanceOfHTMLElement(el)
-            )
-          });
+          locatorsChains.push(
+            new LocatorChain([
+              {
+                selector,
+                locator: this.getSelectorLocator(selector),
+                elements: this.getLocatorBase(element).locator(element.tagName.toLowerCase()).elements.filter(
+                  (el) => isInstanceOfHTMLElement(el)
+                )
+              }
+            ])
+          );
         }
-        locatorsCandidates.push(...validLocators);
+        locatorsChains.push(...validLocators);
         if (isForContextElement) {
-          return locatorsCandidates.map(({ selector, locator }) => ({
-            selector,
-            locator
-          }));
+          return locatorsChains.map((chain) => chain.toLocatorCandidate());
         }
-        if (locatorsCandidates.length > this.MAX_TESTING_SELECTORS || locatorsCandidates.filter((sc) => sc.elements.length === 1).length > this.MAX_SINGLE_ELEMENT_SELECTORS || this.checkTimeout(false)) {
+        if (locatorsChains.length > this.MAX_TESTING_SELECTORS || locatorsChains.filter((sc) => sc.elements.length === 1).length > this.MAX_SINGLE_ELEMENT_SELECTORS || this.checkTimeout(false)) {
           break;
         }
         element = element.parentElement;
       }
       if (isPartOfListItem) {
-        const listItemsCandidates = this.filterListItemsSelectors(locatorsCandidates);
+        const listItemsCandidates = this.filterListItemsSelectors(locatorsChains);
         if (listItemsCandidates?.length) {
-          return listItemsCandidates.map(({ selector, locator }) => ({
-            selector,
-            locator,
+          return listItemsCandidates.map((lic) => ({
+            ...lic.toLocatorCandidate(),
             isListSelector: true
           }));
         }
       }
       let filteredCandidates = [];
       try {
-        for (const candidate of locatorsCandidates) {
+        for (const candidate of locatorsChains) {
           this.checkTimeout();
           filteredCandidates.push(
             ...candidate.elements.length === 1 ? [candidate] : await this.reduceMultiCandidates(candidate)
@@ -32878,7 +32595,7 @@
         }
       } catch (error) {
         if (error instanceof TimeoutError) {
-          console.log("Timeout error");
+          console.warn("[PlaywrightCustomLocatorGenerator] Timeout error");
         }
       }
       if (!filteredCandidates?.length) {
@@ -32903,10 +32620,7 @@
         const { selector, locator } = await new PlaywrightElementSelectorGenerator().getSelectorAndLocator(
           this.targetElement
         );
-        filteredCandidates.unshift({
-          selector,
-          locator
-        });
+        filteredCandidates.unshift(new LocatorChain([{ selector, locator }]));
       }
       filteredCandidates = filteredCandidates.concat(
         await this.addOptionalParentSelector(
@@ -32915,21 +32629,26 @@
           expandCSSKeyElements
         )
       );
-      return filteredCandidates.map(({ selector, locator }) => ({
-        selector,
-        locator
-      }));
+      return Array.from(
+        new Map(
+          filteredCandidates.map((fc) => [
+            fc.toLocatorCandidate().selector,
+            fc.toLocatorCandidate()
+          ])
+        ).values()
+      );
     }
     /**
      * Test if a selector can locate an element
      *
      * @param selector selector to test
      * @param element element to test the selector on
-     * @param testVariables object containing variables information to test the selector with
+     * @param testVariables object containing variables information to test the locator with
      * @param testUniqueness test if selector returns only one element
      * @returns object with valid flag and locator candidate if valid
      */
-    testSelector(selector, element, testVariables, testUniqueness = true) {
+    testSelector(locator, element, testVariables, testUniqueness = true) {
+      const selector = getElementWindowPlaywright(element).selector(element);
       const locatorResult = this.getLocatorBase(element).locator(selector);
       console.log("Locator result", locatorResult);
       const testResult = /* @__PURE__ */ __name((locatorResult2) => {
@@ -32944,10 +32663,10 @@
         return { valid: false };
       }
       let variableSelectionData = {};
-      if (testVariables?.selectorWithVars?.length) {
+      if (testVariables?.locatorWithVars?.length) {
         try {
           const func = new Function(
-            `{ return function(element) { ${testVariables.variablesCode}; return this.getLocatorBase(element).locator(\`${testVariables.selectorWithVars}\`); } }`
+            `{ return function(element) { ${testVariables.variablesCode}; return this.getLocatorBase(element).locator(\`${testVariables.locatorWithVars}\`); } }`
           );
           const res = func().call(this, element);
           console.log("Locator with vars result", res);
@@ -32955,10 +32674,12 @@
             return { valid: false };
           }
           variableSelectionData = {
-            selectorWithVars: testVariables.selectorWithVars,
-            locatorWithVars: replaceLocatorQuotesWithTicks(
-              this.getSelectorLocator(testVariables.selectorWithVars, element)
-            )
+            selectorWithVars: selector,
+            // TODO: selector with vars is similar to selector, should be different
+            locatorWithVars: testVariables.locatorWithVars
+            //   locatorWithVars: replaceLocatorQuotesWithTicks(
+            //     this.getSelectorLocator(testVariables.selectorWithVars, element)
+            //   ),
           };
         } catch (error) {
           console.error("Error testing selector with variables", error.message);
@@ -32968,7 +32689,7 @@
       return {
         valid: true,
         selector,
-        locator: this.getSelectorLocator(selector, element),
+        locator,
         ...variableSelectionData
       };
     }
@@ -32986,10 +32707,12 @@
           2e3
         );
         if (selector.length < 50) {
-          return {
-            selector,
-            locator: `locator('${selector}')`
-          };
+          return new LocatorChain([
+            {
+              selector,
+              locator: `locator('${selector}')`
+            }
+          ]);
         }
       } catch (error) {
         console.error("Error getting CSS selector", error);
@@ -32999,20 +32722,22 @@
      * If playwright selector for element points at a different element - generate selectors for that element as well
      * i.e - playwright can point at a parent button if element is a child of it
      */
-    addOptionalParentSelector(useTextContent, addCSSSelectorGenerator, expandCSSKeyElements) {
+    async addOptionalParentSelector(useTextContent, addCSSSelectorGenerator, expandCSSKeyElements) {
       try {
         const playwright = getElementWindowPlaywright(this.targetElement);
         const playwrightTargetElement = playwright.locator(
           playwright.selector(this.targetElement)
         ).element;
         if (playwrightTargetElement !== this.targetElement && playwrightTargetElement?.contains(this.targetElement)) {
-          return this.generate(playwrightTargetElement, [], {
+          return (await this.generate(playwrightTargetElement, [], {
             isPartOfListItem: false,
             isForContextElement: false,
             useTextContent,
             addCSSSelectorGenerator,
             expandCSSKeyElements
-          });
+          })).map(
+            ({ selector, locator }) => new LocatorChain([{ selector, locator }])
+          );
         }
       } finally {
         return [];
@@ -33221,23 +32946,27 @@
     async reduceMultiCandidates(candidate) {
       await awaitSleep(100);
       const { elements } = candidate;
-      const parts = candidate.selector.split(" >> ");
+      const parts = candidate.getSelector().split(" >> ");
       const newCandidates = [];
       const locatorBase = this.getLocatorBase(this.targetElement);
       const addCandidateWithSelector = /* @__PURE__ */ __name((selector) => {
         try {
-          newCandidates.push({
-            selector,
-            locator: this.getSelectorLocator(selector),
-            options: candidate.options
-          });
+          newCandidates.push(
+            new LocatorChain([
+              {
+                selector,
+                locator: this.getSelectorLocator(selector)
+                //   options: candidate.options,
+              }
+            ])
+          );
           return newCandidates.length >= this.MAX_MULTICANDIDATE_PROCESSING;
         } catch (error) {
           console.error(error);
           return false;
         }
       }, "addCandidateWithSelector");
-      const addCSSFilterToLocator = /* @__PURE__ */ __name((filter) => candidate.selector + // if we used css selector with tag name - concatentate it with the filter
+      const addCSSFilterToLocator = /* @__PURE__ */ __name((filter) => candidate.getSelector() + // if we used css selector with tag name - concatentate it with the filter
       (parts[parts.length - 1] === this.targetElement.tagName.toLowerCase() ? filter : (
         // else - add as a new part
         ` >> internal:and=${escapeForAndLocator(
@@ -33245,7 +32974,7 @@
         )}`
       )), "addCSSFilterToLocator");
       const addIfSingularAndCheckLimit = /* @__PURE__ */ __name((selector) => {
-        if (locatorBase.locator(selector, candidate.options).elements.length === 1) {
+        if (locatorBase.locator(selector).elements.length === 1) {
           return addCandidateWithSelector(selector);
         }
         return false;
@@ -33253,7 +32982,7 @@
       if (elements.length < 5) {
         const index2 = elements.indexOf(this.targetElement);
         if (index2 !== -1) {
-          addCandidateWithSelector(candidate.selector + ` >> nth=${index2}`);
+          addCandidateWithSelector(candidate.getSelector() + ` >> nth=${index2}`);
         }
       }
       const parent = this.targetElement.parentElement;
@@ -33298,12 +33027,11 @@
     }
     getAllLocators(element, cssKeyElements, options = {}) {
       options = {
-        returnLocator: false,
         exact: true,
         useTextContent: true,
         ...options
       };
-      return [
+      const locators = [
         this.getByRoleLocator(element, options),
         options.useTextContent ? this.getByTextLocator(element, options) : null,
         this.getByLabelLocator(element, options),
@@ -33311,26 +33039,80 @@
         this.getByTitleLocator(element, options),
         this.getByAltLocator(element, options),
         this.getTestIdLocator(element, options),
-        ...element === this.targetElement ? [this.getInnerFeaturesLocator(element, options)] : [],
-        ...cssKeyElements.filter((el) => el.element === element).map((el) => el.selector)
+        ...element === this.targetElement ? [this.getInnerFeaturesLocator(element)] : [],
+        ...cssKeyElements.filter((el) => el.element === element).map((el) => ({
+          selector: el.selector,
+          locator: this.getSelectorLocator(el.selector)
+        }))
       ].filter((locator) => locator);
+      if (!locators.length && options.bruteForceMode) {
+        return locators.concat(this.findUniqueCSSLocatorForElement(element));
+      }
+      return locators;
     }
-    getInnerFeaturesLocator(element, options) {
+    /**
+     * Used when in brute force mode to find unique CSS locator for the element
+     */
+    findUniqueCSSLocatorForElement(element, maxCandidates = 5) {
+      const candidates = [];
+      const addCandidate = /* @__PURE__ */ __name((selector) => {
+        candidates.push([
+          {
+            selector,
+            locator: `locator('${selector}')`
+          }
+        ]);
+        return candidates.length >= maxCandidates;
+      }, "addCandidate");
+      for (const attribute of Array.from(element.attributes).filter(
+        ({ name, value }) => value.length < 30 && !COVERED_ATTRIBUTES.includes(name)
+      )) {
+        try {
+          const selector = `[${attribute.name}${attribute.value ? `="${attribute.value}"` : ""}]`;
+          if (element.ownerDocument.querySelectorAll(selector).length === 1) {
+            if (addCandidate(selector)) {
+              return candidates;
+            }
+          }
+        } catch (error) {
+        }
+      }
+      for (const className of Array.from(element.classList).filter(
+        (cls) => !CLASS_IGNORE_LIST.includes(cls)
+      )) {
+        try {
+          const selector = `.${escapeSelector(className)}`;
+          if (element.ownerDocument.querySelectorAll(selector).length === 1) {
+            if (addCandidate(selector)) {
+              return candidates;
+            }
+          }
+        } catch (error) {
+        }
+      }
+      return candidates;
+    }
+    getInnerFeaturesLocator(element) {
       const tag = element.tagName.toLowerCase();
       if (!isInstanceOfHTMLElement(element) || ["html", "body", "div"].includes(tag)) {
         return;
       }
-      const innerFeatures = new InnerFeaturesExtractor().extract(element).filter((f2) => !f2.isRoot).slice(0, 4).map((feature) => getFeatureSelector(feature));
+      const innerFeatures = new InnerFeaturesExtractor().extract(element).filter((f2) => !f2.isRoot).slice(0, 4).map((feature) => getFeatureSelector(feature).pop());
       if (innerFeatures.length < 2) {
         return;
       }
-      return options.returnLocator ? `locator('${tag}', {has: page.locator('${innerFeatures.join("")}')})` : tag + innerFeatures.map((feature) => `:has(${feature})`).join("");
+      const selector = tag + innerFeatures.map((feature) => `:has(${feature})`).join("");
+      return {
+        selector,
+        locator: this.getSelectorLocator(selector)
+      };
     }
     getByRoleLocator(element, options = {}) {
       try {
         if (!isInstanceOfHTMLElement(element)) {
           throw new Error("Provided element is not an HTMLElement");
         }
+        const usedFilters = {};
         const roleMappings = {
           button: "button",
           input: /* @__PURE__ */ __name((el) => el.type === "checkbox" ? "checkbox" : el.type === "radio" ? "radio" : "textbox", "input"),
@@ -33348,7 +33130,8 @@
           table: "table",
           tr: "row",
           th: "columnheader",
-          td: "cell"
+          td: "cell",
+          img: "img"
         };
         const tagName = element.tagName.toLowerCase();
         const role = element.getAttribute("role") || (roleMappings[tagName] instanceof Function ? roleMappings[tagName](element) : roleMappings[tagName]);
@@ -33375,22 +33158,36 @@
           if (attributeVal) {
             return normalize(attributeVal);
           }
-          const text = normalizeWhiteSpace(elementText(element).full);
+          const injText = elementText(element);
+          const text = normalizeWhiteSpace(injText.full);
           if (!text?.length) {
             return none;
           }
           const textVal = normalize(text);
-          if (this.usedFilters.hasText.includes(textVal.text)) {
-            return none;
-          }
-          this.usedFilters.hasText.push(textVal.text);
+          usedFilters.hasText = textVal.text;
           return textVal;
         }, "getAccessibleName");
         const { text: name, exact } = getAccessibleName();
         if (name && name.length > 0 && name.length < 30) {
           props.push(["name", escapeForAttributeSelector(name, exact)]);
         }
-        return options.returnLocator ? `getByRole('${role}', { ${props.join(", ")} })` : `internal:role=${role}${props.map(([n2, v2]) => `[${n2}=${v2}]`).join("")}`;
+        const getSelection = /* @__PURE__ */ __name(() => {
+          const selector = `internal:role=${role}${props.map(([n2, v2]) => `[${n2}=${v2}]`).join("")}`;
+          return {
+            locator: this.getSelectorLocator(selector),
+            selector,
+            options: usedFilters
+          };
+        }, "getSelection");
+        let selection = getSelection();
+        if (name?.length && exact && !this.getLocatorBase(element).locator(selection.selector).elements.includes(element)) {
+          props.find((p) => p[0] === "name")[1] = escapeForAttributeSelector(
+            name,
+            false
+          );
+          selection = getSelection();
+        }
+        return selection;
       } catch (error) {
         console.error("Error getting role locator", error.message);
       }
@@ -33404,20 +33201,35 @@
         if (!text?.length || text.length > 100) {
           return;
         }
+        const usedFilters = {};
         if (Array.from(element.children).filter((el) => isInstanceOfHTMLElement(el)).some(
           (child) => normalizeWhiteSpace(elementText(child).full) === text
         )) {
-          if (!this.usedFilters.hasText.includes(text)) {
-            this.usedFilters.hasText.push(text);
-            return `${element.tagName.toLowerCase()} >> internal:has-text=${escapeForTextSelector(
-              text,
-              false
-            )}`;
-          }
-          return;
+          usedFilters.hasText = text;
+          const selector = `${element.tagName.toLowerCase()} >> internal:has-text=${escapeForTextSelector(
+            text,
+            false
+          )}`;
+          return {
+            selector,
+            locator: this.getSelectorLocator(selector),
+            options: usedFilters
+          };
         }
-        const escapedText = escapeForTextSelector(text, options.exact);
-        return options.returnLocator ? `getByText('${escapedText}')` : "internal:text=" + escapedText;
+        const getSelection = /* @__PURE__ */ __name((exact) => {
+          const escapedText = escapeForTextSelector(text, exact);
+          const selector = "internal:text=" + escapedText;
+          return {
+            selector,
+            locator: this.getSelectorLocator(selector),
+            options: usedFilters
+          };
+        }, "getSelection");
+        let selection = getSelection(options.exact);
+        if (options.exact && !this.getLocatorBase(element).locator(selection.selector).elements.includes(element)) {
+          selection = getSelection(false);
+        }
+        return selection;
       } catch (error) {
       }
     }
@@ -33430,7 +33242,13 @@
           return;
         }
         const respond = /* @__PURE__ */ __name((label) => {
-          return options.returnLocator ? `getByLabel('${label}')` : `internal:label=${escapeForTextSelector(label, options.exact)}`;
+          return {
+            selector: `internal:label=${escapeForTextSelector(
+              label,
+              options.exact
+            )}`,
+            locator: `getByLabel('${label}')`
+          };
         }, "respond");
         const ariaLabel = element.getAttribute("aria-label");
         if (ariaLabel) {
@@ -33485,10 +33303,13 @@
         }
         const attributeVal = element.getAttribute(attribute);
         if (attributeVal) {
-          return options.returnLocator ? `getBy${attribute.charAt(0).toUpperCase() + attribute.slice(1)}('${attributeVal}')` : `internal:attr=[${attribute}=${escapeForAttributeSelector(
-            attributeVal,
-            options.exact
-          )}]`;
+          return {
+            selector: `internal:attr=[${attribute}=${escapeForAttributeSelector(
+              attributeVal,
+              options.exact
+            )}]`,
+            locator: `getBy${attribute.charAt(0).toUpperCase() + attribute.slice(1)}('${attributeVal}')`
+          };
         }
       } catch (error) {
       }
@@ -33510,7 +33331,7 @@
       return { text, exact };
     }
     checkTimeout(throwError = true) {
-      if (DEBUG_MODE) {
+      if (DEBUG_MODE2) {
         return false;
       }
       if (this.MAX_PROCESSING_TIME && Date.now() - this.startTimestamp > this.MAX_PROCESSING_TIME) {
@@ -34050,7 +33871,10 @@
     static {
       __name(this, "ParentChainReducer");
     }
-    async reduce(element, options = { useLionTail: true }) {
+    async reduce(element, options = {
+      useLionTail: true,
+      useChecksumIds: true
+    }) {
       console.log("[ParentChainReducer] will reduce", element);
       if (!isNodeInstanceOf(element, "HTMLElement") && !isNodeInstanceOf(element, "SVGElement")) {
         throw new Error("Element is not an HTMLElement");
@@ -34073,7 +33897,7 @@
      * @param useLionTail whether to use LionTail to get the full dom tree close to the edge
      * @returns string
      */
-    getAncestorsHTMLSnippet(element, { useLionTail = true } = {}) {
+    getAncestorsHTMLSnippet(element, { useLionTail = true, useChecksumIds = true } = {}) {
       this.elementsInSimplifiedDomByChecksumId = {};
       let lionTailMaxOuterHTMLLength = this.MAX_LIONTAIL_SIZE;
       let attributeMaxSize = this.MAX_ATTRIBUTE_SIZE;
@@ -34104,11 +33928,15 @@
         do {
           rootClone = ancestors[0].cloneNode(false);
           let currentClone = rootClone;
+          const rootCloneSerialized = serializeElement(rootClone);
           for (let i2 = 1; i2 < ancestors.length; i2++) {
             if (useLionTail) {
               const lionTailSize = serializeElement(ancestors[i2]).length;
-              if (lionTailSize <= lionTailMaxOuterHTMLLength && serializeElement(rootClone).length + lionTailSize <= this.MAX_SNIPPET_SIZE) {
-                let newClone2 = this.deepCloneNode(ancestors[i2], counter);
+              if (lionTailSize <= lionTailMaxOuterHTMLLength && rootCloneSerialized.length + lionTailSize <= this.MAX_SNIPPET_SIZE) {
+                let newClone2 = this.deepCloneNode(
+                  ancestors[i2],
+                  useChecksumIds ? counter : void 0
+                );
                 currentClone.appendChild(newClone2);
                 break;
               }
@@ -34116,9 +33944,11 @@
             let newClone = normalizeNode(
               ancestors[i2].cloneNode(ancestors[i2] === element)
             );
-            const id = counter.getAndIncrement();
-            newClone.setAttribute("checksumid", id);
-            this.elementsInSimplifiedDomByChecksumId[id] = ancestors[i2];
+            if (useChecksumIds) {
+              const id = counter.getAndIncrement();
+              newClone.setAttribute("checksumid", id);
+              this.elementsInSimplifiedDomByChecksumId[id] = ancestors[i2];
+            }
             currentClone.appendChild(newClone);
             currentClone = newClone;
           }
@@ -34130,7 +33960,9 @@
         } while (rootClone.outerHTML.length > this.MAX_SNIPPET_SIZE && attributeMaxSize > 0);
         rootClone.querySelectorAll("*").forEach((el) => {
         });
-        let htmlSnippet = serializeElement(rootClone);
+        let htmlSnippet = serializeElement(rootClone, {
+          limitAttributeLength: true
+        });
         return htmlSnippet;
       } catch (e2) {
         console.error("Error while getting ancestors HTML snippet", e2);
@@ -34153,7 +33985,7 @@
           const child = currentNode.childNodes[i2];
           const childClone = child.cloneNode(false);
           currentClone.appendChild(childClone);
-          if (isNodeInstanceOf(child, "HTMLElement")) {
+          if (counter && isNodeInstanceOf(child, "HTMLElement")) {
             const id = counter.getAndIncrement();
             childClone.setAttribute("checksumid", id);
             this.elementsInSimplifiedDomByChecksumId[id] = child;
@@ -34417,7 +34249,6 @@
           },
           "*"
         );
-        console.log("selected", this.selected);
       }, "onClick");
       this.handleSubDocument = /* @__PURE__ */ __name((newRootDocument, defaultView) => {
         if (this.subDocumentInspector) {
@@ -34715,15 +34546,15 @@ ${data.locator}`
     /**
      * Tests a selector for a given element.
      */
-    testElementSelector(selector, element, testVariables, testUniqueness = true) {
-      if (typeof element === "string") {
-        element = this.htmlReducer.getElementForChecksumId(
-          element
-        );
+    testElementSelector(locator, element, testVariables, testUniqueness = true) {
+      const testElement = typeof element === "string" ? this.htmlReducer.getElementForChecksumId(element) : element;
+      if (!testElement) {
+        console.error("Element not found", element);
+        return { valid: false, error: "Element not found" };
       }
       return new PlaywrightCustomLocatorGenerator().testSelector(
-        selector,
-        element,
+        locator,
+        testElement,
         testVariables,
         testUniqueness
       );
@@ -34735,16 +34566,18 @@ ${data.locator}`
      * @param useLionTail whether to use the lion tail for the parent chain.
      *                    Lion tail means that we include the closest HTML surrounding of the element
      *                    to add more context to the parent chain and the target element.
+     * @param useChecksumIds whether to use checksumIds in the reduced HTML
      * @returns
      */
-    async getParentChainHTML(element, useLionTail = true) {
+    async getParentChainHTML(element, useLionTail = true, useChecksumIds = true) {
       if (typeof element === "string") {
         element = this.htmlReducer.getElementForChecksumId(
           element
         );
       }
       const response = await this.parentChainReducer.reduce(element, {
-        useLionTail
+        useLionTail,
+        useChecksumIds
       });
       return response.reducedHTML;
     }
@@ -34766,9 +34599,9 @@ ${data.locator}`
         this.sessionMirror = new SessionRecorder((event, isCheckout) => {
           event.isCheckout = isCheckout;
           window.checksumSendBroadcastMessage?.("rrweb", [event]);
-          rrwebEventsStorageManager.onRRwebEvent(event);
+          this.lastRrwebEventTimestamp = event.timestamp;
+          console.log(event.timestamp);
         }, config.recordOptions);
-        rrwebEventsStorageManager.initRRwebEvents();
       }
       if (initFilesObserver) {
         this.filesObserver = new FilesObserver(this.sessionMirror);
@@ -34972,12 +34805,12 @@ ${data.locator}`
     /**
      * Performs an HTTP post with the JSON of the rrweb events array to a given URL.
      */
-    async postRRwebEvents(url) {
-      return rrwebEventsStorageManager.postRRwebEvents(url);
-    }
-    async getRRwebEvents(id) {
-      return rrwebEventsStorageManager.getRRwebEvents(id);
-    }
+    // async postRRwebEvents(url) {
+    //   return rrwebEventsStorageManager.postRRwebEvents(url);
+    // }
+    // async getRRwebEvents(id: number) {
+    //   return rrwebEventsStorageManager.getRRwebEvents(id);
+    // }
     /**
      * Function used to reduce the HTML of the page to a minimal set of elements that are required
      * to produce a prompt for the LLM agent.
@@ -34991,17 +34824,10 @@ ${data.locator}`
         { ...this.appSpecificRules, ...appSpecificRules },
         options
       );
-      const rrwebEventKey = rrwebEventsStorageManager.isInitialized() ? rrwebEventsStorageManager.getLastRRwebEventKey() : void 0;
-      if (rrwebEventKey) {
-        const rrwebEvent = await rrwebEventsStorageManager.getRRwebEvent(
-          rrwebEventKey
-        );
-        if (rrwebEvent) {
-          reducedHTMLData.lastRRwebEvent = {
-            key: rrwebEventKey,
-            timestamp: rrwebEvent.timestamp
-          };
-        }
+      if (this.lastRrwebEventTimestamp) {
+        reducedHTMLData.lastRRwebEvent = {
+          timestamp: this.lastRrwebEventTimestamp
+        };
       }
       if (options.extractESRAForInterpretationRequiredElements) {
         console.log("Extracting ESRA for interpretation required elements...");
@@ -35639,9 +35465,6 @@ ${data.locator}`
     goLive() {
       return this.sessionReplayer.goLive();
     }
-    getLastEventTimestamps(snapshot2 = false) {
-      return this.sessionReplayer.getLastEventTimestamps(snapshot2);
-    }
   };
 
   // ../browser-lib/src/visual-test-generator/time-machine-event-handlers.ts
@@ -35674,7 +35497,6 @@ ${data.locator}`
         }
       }
       if (extractPlaywrightSelector) {
-        console.log("extracting playwright selector...");
         const {
           selector: playwrightSelector,
           locator,
@@ -35685,7 +35507,6 @@ ${data.locator}`
         selector.playwrightSelector = playwrightSelector;
         selector.playwrightLocator = locator;
         selector.playwrightParentFramesSelectors = parentFramesSelectors;
-        console.log("Playwright selector extraction complete");
       }
       return selector;
     }
@@ -35951,6 +35772,7 @@ ${data.locator}`
       this.sessionReplayer = new SessionReplayer({
         enableInteract: false,
         root: liveTMDiv
+        // onlyLive: true,
       });
       this.sessionReplayer.start({ firstEventTimestamp: Date.now() });
     }
@@ -36242,7 +36064,10 @@ ${data.locator}`
       if (!node2) {
         return {};
       }
-      const selector = await this.elementSelector.getSelector(node2);
+      const selector = await this.elementSelector.getSelector(node2, {
+        extractEsraMetadata: false
+        // For now, don't produce ESRA metadata for VTG steps recording
+      });
       if (!selector) {
         return { node: node2 };
       }
