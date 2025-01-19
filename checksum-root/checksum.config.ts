@@ -14,38 +14,27 @@ export default getChecksumConfig({
   apiKey: "<API key>",
 
   /**
-   * This is the base URL of the tested app. E.g. https://example.com. URLs in the tests will be relative to the base URL.
+   * Define your test run environments and test users within each environment.
+   * The environments must be aligned with those set here:
+   * https://app.checksum.ai/#/settings/
    */
-  baseURL: "<base URL>",
-
-  /**
-   * Insert the account's username that will be used
-   * to login into your testing environment
-   */
-  username: "<username>",
-
-  /**
-   * Insert the account's password that will be used
-   * to login into your testing environment
-   */
-  password: "<password>",
-
-  /**
-   * The credentials of the users that will be used to login into your testing environment
-   * Uncomment if you require support for multiple users
-   */
-  // users: [
-  //   {
-  //     role: "host",
-  //     username: "<host username>",
-  //     password: "<host password>",
-  //   },
-  //   {
-  //     role: "guest",
-  //     username: "<guest username>",
-  //     password: "<guest password>",
-  //   },
-  // ],
+  environments: [
+    {
+      name: "<The name of the environment>",
+      baseURL:
+        "<The base URL of the tested app. e.g. https://example.com. URLs in the tests will be relative to the base URL>",
+      loginURL: "<The URL of the login page>",
+      default: true,
+      users: [
+        {
+          role: "<The role of the user, may be undefined in case of single user>",
+          username: "<username>",
+          password: "<password>",
+          default: true,
+        },
+      ],
+    },
+  ],
 
   options: {
     /**
