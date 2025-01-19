@@ -7598,9 +7598,9 @@
         case Node.TEXT_NODE:
           return node2.nodeValue;
         case Node.CDATA_SECTION_NODE:
-          return includeCDATA ? `<![CDATA[${node2.nodeValue}]]>` : "";
+          return includeCDATA && node2.nodeValue.trim().length > 0 ? `<![CDATA[${node2.nodeValue}]]>` : "";
         case Node.COMMENT_NODE:
-          return includeComments ? `<!--${node2.nodeValue}-->` : "";
+          return includeComments && node2.nodeValue.trim().length > 0 ? `<!--${node2.nodeValue}-->` : "";
         default:
           return "";
       }
@@ -33351,6 +33351,68 @@
   }
   __name(isInstanceOfHTMLElement, "isInstanceOfHTMLElement");
 
+  // ../browser-lib/src/helpers/dom/xpath.ts
+  function getRelativeXPath(element = document, child) {
+    try {
+      let getNodeIdentifier2 = function(node3) {
+        let identifier = node3.nodeName.toLowerCase();
+        let foundAttributeIdentifier = false;
+        ["name", "label", "aria-label", "data-testid", "role"].forEach((attr) => {
+          if (node3.hasAttribute(attr)) {
+            identifier += `[@${attr}="${node3.getAttribute(attr)}"]`;
+            foundAttributeIdentifier = true;
+          }
+        });
+        if (!foundAttributeIdentifier) {
+          let index2 = 1;
+          let sibling = node3.previousSibling;
+          while (sibling) {
+            if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === node3.nodeName) {
+              index2++;
+            }
+            sibling = sibling.previousSibling;
+          }
+          if (index2 > 1) {
+            identifier += `[${index2}]`;
+          }
+        }
+        return identifier;
+      };
+      var getNodeIdentifier = getNodeIdentifier2;
+      __name(getNodeIdentifier2, "getNodeIdentifier");
+      if (!element || !child || !element.contains(child)) {
+        throw new Error("Child is not a descendant of the given element.");
+      }
+      let path = [];
+      let node2 = child;
+      while (node2 !== element) {
+        if (node2.nodeType === Node.ELEMENT_NODE) {
+          path.unshift(getNodeIdentifier2(node2));
+        }
+        node2 = node2.parentElement;
+      }
+      return path.join("/");
+    } catch (error) {
+      console.error("Failed to get relative xpath", error);
+      return;
+    }
+  }
+  __name(getRelativeXPath, "getRelativeXPath");
+  function findElementsByXPath(parentElement2, xpath) {
+    let evaluator = new XPathEvaluator();
+    let result2 = evaluator.evaluate(
+      xpath,
+      parentElement2,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    return [result2.singleNodeValue].filter(
+      (node2) => node2 instanceof HTMLElement
+    );
+  }
+  __name(findElementsByXPath, "findElementsByXPath");
+
   // src/lib/test-generator/selectors/compound-selector.ts
   var CLASS_IGNORE_LIST = [
     ":hover",
@@ -33441,7 +33503,7 @@
       const compoundSelector = {
         // generate selectors from the common root to the target element
         targetSelection: {
-          xpath: this.getRelativeXPath(commonRoot, targetElement.element),
+          xpath: getRelativeXPath(commonRoot, targetElement.element),
           cssSelectors: this.generateAllContextualSelectors(
             commonRoot,
             targetElement.element
@@ -33535,7 +33597,7 @@
       if (targetSelection.xpath) {
         try {
           addElementstoHistogram(
-            this.findElementsByXPath(commonParent, targetSelection.xpath)
+            findElementsByXPath(commonParent, targetSelection.xpath)
           );
         } catch (error) {
         }
@@ -33698,68 +33760,6 @@
         }
       });
       return [...new Set(selectors)];
-    }
-    /**
-     * Builds relative xpath from an element to its child
-     */
-    getRelativeXPath(element, child) {
-      try {
-        let getNodeIdentifier = function(node3) {
-          let identifier = node3.nodeName.toLowerCase();
-          let foundAttributeIdentifier = false;
-          ["name", "label", "aria-label", "data-testid", "role"].forEach(
-            (attr) => {
-              if (node3.hasAttribute(attr)) {
-                identifier += `[@${attr}="${node3.getAttribute(attr)}"]`;
-                foundAttributeIdentifier = true;
-              }
-            }
-          );
-          if (!foundAttributeIdentifier) {
-            let index2 = 1;
-            let sibling = node3.previousSibling;
-            while (sibling) {
-              if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === node3.nodeName) {
-                index2++;
-              }
-              sibling = sibling.previousSibling;
-            }
-            if (index2 > 1) {
-              identifier += `[${index2}]`;
-            }
-          }
-          return identifier;
-        };
-        __name(getNodeIdentifier, "getNodeIdentifier");
-        if (!element || !child || !element.contains(child)) {
-          throw new Error("Child is not a descendant of the given element.");
-        }
-        let path = [];
-        let node2 = child;
-        while (node2 !== element) {
-          if (node2.nodeType === Node.ELEMENT_NODE) {
-            path.unshift(getNodeIdentifier(node2));
-          }
-          node2 = node2.parentElement;
-        }
-        return path.join("/");
-      } catch (error) {
-        console.error("Failed to get relative xpath", error);
-        return;
-      }
-    }
-    findElementsByXPath(parentElement2, xpath) {
-      let evaluator = new XPathEvaluator();
-      let result2 = evaluator.evaluate(
-        xpath,
-        parentElement2,
-        null,
-        XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null
-      );
-      return [result2.singleNodeValue].filter(
-        (node2) => node2 instanceof HTMLElement
-      );
     }
     /**
      * Create a contextual selector from the common root to the target element
@@ -33958,8 +33958,6 @@
           );
           attributeMaxSize = Math.max(attributeMaxSize - 10, 0);
         } while (rootClone.outerHTML.length > this.MAX_SNIPPET_SIZE && attributeMaxSize > 0);
-        rootClone.querySelectorAll("*").forEach((el) => {
-        });
         let htmlSnippet = serializeElement(rootClone, {
           limitAttributeLength: true
         });
@@ -35750,7 +35748,8 @@ ${data.locator}`
                   selector: dropzoneSelector.playwrightSelector,
                   locator: dropzoneSelector.playwrightLocator,
                   parentFramesSelectors: dropzoneSelector.playwrightParentFramesSelectors,
-                  esraMetadata: dropzoneSelector.esraMetadata
+                  esraMetadata: dropzoneSelector.esraMetadata,
+                  rrwebId: dropzoneNodeId
                 }
               }
             )
@@ -35771,8 +35770,8 @@ ${data.locator}`
       window.parent.document.body.appendChild(liveTMDiv);
       this.sessionReplayer = new SessionReplayer({
         enableInteract: false,
-        root: liveTMDiv
-        // onlyLive: true,
+        root: liveTMDiv,
+        onlyLive: true
       });
       this.sessionReplayer.start({ firstEventTimestamp: Date.now() });
     }
@@ -36018,6 +36017,9 @@ ${data.locator}`
         pageId: void 0,
         timestamp: event.timestamp,
         id: data?.id || Date.now().toString(),
+        // @ts-ignore
+        rrwebId: event.data?.id,
+        // add rrwebId for services caching
         ...data
       };
     }
