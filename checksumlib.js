@@ -29412,13 +29412,73 @@
 
   // ../browser-lib/src/session-record-replay/session-replayer.ts
   var import_await_sleep3 = __toESM(require_await_sleep());
+
+  // ../browser-lib/src/session-record-replay/replayer-listeners-manager.ts
+  var ReplayerListenersManager = class {
+    constructor() {
+      this._replayingState = "Paused" /* Paused */;
+      // Internal state for isShowing
+      this.listeners = [];
+    }
+    static {
+      __name(this, "ReplayerListenersManager");
+    }
+    // Listeners array
+    // Setter for isShowing with listener notification
+    set replayingState(value) {
+      this._replayingState = value;
+      this.notifyListeners();
+    }
+    // Add a listener to observe changes to isShowing
+    addListener(listener) {
+      this.listeners.push(listener);
+    }
+    // Remove a listener
+    removeListener(listener) {
+      this.listeners = this.listeners.filter((l2) => l2 !== listener);
+    }
+    // Wrapper function to handle loading state
+    async wrapWithLoadingState(fn, loadingCompletedState = "Paused" /* Paused */) {
+      this.replayingState = "Processing" /* Processing */;
+      return new Promise((resolve2, reject) => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            fn().then((result2) => {
+              resolve2(result2);
+            }).catch((error) => {
+              reject(error);
+            }).finally(() => {
+              this.replayingState = loadingCompletedState;
+            });
+          }, 0);
+        });
+      });
+    }
+    // Notify all listeners of the state change
+    notifyListeners() {
+      this.listeners.forEach((listener) => listener(this._replayingState));
+    }
+  };
+
+  // ../browser-lib/src/session-record-replay/session-replayer.ts
   var DEBUG_MODE = false;
   var SessionReplayer = class {
     constructor(config = {}) {
-      // array of events to init replayer
-      this.eventsBuffer = [];
+      this.initialEventsBuffer = [];
       this.config = {
         enableInteract: false
+      };
+      this.overlayElement = null;
+      this.timer = null;
+      this.animationFrameStepHandler = {
+        wait: /* @__PURE__ */ __name((callback) => requestAnimationFrame(callback), "wait"),
+        cancel: /* @__PURE__ */ __name((id) => cancelAnimationFrame(id), "cancel")
+      };
+      this.timoutStepHandler = {
+        wait: /* @__PURE__ */ __name((callback) => {
+          return setTimeout(callback, 100);
+        }, "wait"),
+        cancel: /* @__PURE__ */ __name((id) => clearTimeout(id), "cancel")
       };
       this.stop = /* @__PURE__ */ __name(() => {
         try {
@@ -29442,6 +29502,7 @@
         castedEvents: []
       };
       this.config = { ...this.config, ...config };
+      this.replayerListenersManager = new ReplayerListenersManager();
     }
     static {
       __name(this, "SessionReplayer");
@@ -29487,18 +29548,53 @@
         }
       });
     }
+    getCurrentTimestamp() {
+      try {
+        return this.replayer.getCurrentTime() + this.firstEvent.timestamp;
+      } catch (e2) {
+        return 0;
+      }
+    }
+    monitorTime(targetTime, onTargetHook, stepHandler = this.animationFrameStepHandler) {
+      const stopTimer = /* @__PURE__ */ __name(() => {
+        if (this.timer) {
+          stepHandler.cancel(this.timer);
+          this.timer = null;
+        }
+      }, "stopTimer");
+      stopTimer();
+      const update = /* @__PURE__ */ __name(() => {
+        const currentTime = this.replayer.getCurrentTime();
+        if (targetTime && currentTime >= targetTime) {
+          console.log(
+            `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}`,
+            Date.now()
+          );
+          onTargetHook();
+          stopTimer();
+          return;
+        } else {
+          console.log(
+            `[SessionReplayer] monitoring time, current: ${currentTime}; target: ${targetTime}...`
+          );
+        }
+        const meta = this.replayer.getMetaData();
+        if (currentTime < meta.totalTime) {
+          this.timer = stepHandler.wait(update);
+        }
+      }, "update");
+      this.timer = stepHandler.wait(update);
+    }
     seek(ts, pause = true) {
       return new Promise((resolve2) => {
         const delta = ts - this.firstEvent.timestamp;
-        this.replayer.play(delta);
-        if (pause) {
-          setTimeout(() => {
-            this.replayer?.pause();
-            resolve2();
-          }, 0);
-        } else {
+        this.monitorTime(delta, () => {
+          if (pause) {
+            this.replayer.pause();
+          }
           resolve2();
-        }
+        });
+        this.replayer.play(delta);
       });
     }
     start(options, castedEvents = []) {
@@ -29509,9 +29605,9 @@
         if (this.config.onlyLive) {
           this.makeReplayer([], { baselineTime: events[0].timestamp });
         } else {
-          this.eventsBuffer.push(...events);
-          if (this.eventsBuffer.length > 2) {
-            this.makeReplayer(this.eventsBuffer);
+          this.initialEventsBuffer.push(...events);
+          if (this.initialEventsBuffer.length >= 2) {
+            this.makeReplayer(this.initialEventsBuffer);
           } else {
             return;
           }
@@ -29538,16 +29634,22 @@
       return promise;
     }
     async goLive() {
-      await this.seek(this.lastEvent.timestamp, false);
-      await (0, import_await_sleep3.default)(1e3);
+      await this.replayerListenersManager.wrapWithLoadingState(async () => {
+        await this.seek(this.lastEvent.timestamp, false);
+        await (0, import_await_sleep3.default)(1e3);
+      });
     }
     async goBack(timestamp, {
       sleepAfter = 1e3,
       beforeTimestamp = false,
       includeAllMatchingTimestamps = false
     } = {}) {
-      await this.seek(timestamp, true);
-      await (0, import_await_sleep3.default)(1e3);
+      await this.replayerListenersManager.wrapWithLoadingState(async () => {
+        await this.seek(timestamp, true);
+        if (sleepAfter) {
+          await (0, import_await_sleep3.default)(sleepAfter);
+        }
+      });
     }
     storeEvent(event) {
       if (!this.debugData.active) {
@@ -29565,7 +29667,7 @@
       this.debugData.active = true;
       window.__chkreplayer = {
         events: /* @__PURE__ */ __name(() => this.debugData.events, "events"),
-        back: /* @__PURE__ */ __name((ts) => this.goBack(ts, {}), "back"),
+        back: /* @__PURE__ */ __name((ts) => this.goBack(ts), "back"),
         currentTime: /* @__PURE__ */ __name(() => this.replayer.getCurrentTime(), "currentTime"),
         castedEvents: /* @__PURE__ */ __name(() => this.debugData.castedEvents, "castedEvents")
       };
@@ -30691,12 +30793,6 @@
       this.observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           mutation.addedNodes.forEach((addedNode) => {
-            if (addedNode.querySelector) {
-              const ifr = addedNode.querySelector("iframe");
-              if (ifr) {
-                console.log("FFF", ifr);
-              }
-            }
             if (addedNode.nodeType !== Node.ELEMENT_NODE) {
               return;
             }
@@ -32409,7 +32505,7 @@
 
   // ../js-lib/src/helpers/helpers.ts
   var awaitSleep = /* @__PURE__ */ __name((ms) => new Promise((resolve2) => setTimeout(resolve2, ms)), "awaitSleep");
-  var guardReturn = /* @__PURE__ */ __name(async (promise, timeout = 1e3, errMessage = "guardReturnTimedOut") => {
+  var guardReturn = /* @__PURE__ */ __name(async (promise, timeout = 1e3, errMessage) => {
     if (timeout === null) {
       return promise;
     }
@@ -32420,7 +32516,10 @@
     }, "guard");
     const res = await Promise.race([promise, guard()]);
     if (typeof res === "string" && res === timeoutStringIdentifier) {
-      throw new Error(errMessage);
+      if (typeof errMessage === "function") {
+        throw new Error(errMessage());
+      }
+      throw new Error(errMessage ?? "guardReturnTimedOut");
     }
     return res;
   }, "guardReturn");
@@ -32516,6 +32615,7 @@
         this.expandCSSKeyFeatures(element, cssKeyElements);
       }
       while (element && element !== this.rootNode) {
+        await awaitSleep(0);
         const elementCandidates = this.getAllLocators(
           element,
           cssKeyElements,
@@ -32525,11 +32625,12 @@
           }
         );
         const validLocators = [];
-        const testCandidate = /* @__PURE__ */ __name((chain) => {
+        const testCandidate = /* @__PURE__ */ __name(async (chain) => {
           if (chain.hasDuplicateFilters()) {
             return;
           }
           try {
+            await awaitSleep(0);
             const { elements } = this.getLocatorBase(element).locator(
               chain.getSelector()
             );
@@ -32543,15 +32644,15 @@
           }
         }, "testCandidate");
         if (!locatorsChains.length) {
-          elementCandidates.forEach(
-            (ec) => testCandidate(new LocatorChain([ec]))
-          );
+          for (const ec of elementCandidates) {
+            await testCandidate(new LocatorChain([ec]));
+          }
         } else {
-          elementCandidates.forEach((ec) => {
-            locatorsChains.forEach(
-              (sc) => testCandidate(sc.cloneAndAddCandidate(ec))
-            );
-          });
+          for (const ec of elementCandidates) {
+            for (const sc of locatorsChains) {
+              await testCandidate(sc.cloneAndAddCandidate(ec));
+            }
+          }
         }
         if (validLocators.length === 0 && locatorsChains.length === 0) {
           const selector = element.tagName.toLowerCase();
@@ -32944,7 +33045,7 @@
      * @returns array of new candidates that return only one element
      */
     async reduceMultiCandidates(candidate) {
-      await awaitSleep(100);
+      await awaitSleep(0);
       const { elements } = candidate;
       const parts = candidate.getSelector().split(" >> ");
       const newCandidates = [];
@@ -33181,11 +33282,11 @@
         }, "getSelection");
         let selection = getSelection();
         if (name?.length && exact && !this.getLocatorBase(element).locator(selection.selector).elements.includes(element)) {
-          props.find((p) => p[0] === "name")[1] = escapeForAttributeSelector(
-            name,
-            false
-          );
-          selection = getSelection();
+          const nameProp = props.find((p) => p[0] === "name");
+          if (nameProp) {
+            nameProp[1] = escapeForAttributeSelector(name, false);
+            selection = getSelection();
+          }
         }
         return selection;
       } catch (error) {
@@ -34008,6 +34109,7 @@
       this.sessionMirror = sessionMirror;
     }
     // Get files for a specific input by rrwebId
+    // !! used in msg broker
     async getFilesByRrwebId(rrwebId) {
       const files = this.filesMap[rrwebId] ?? [];
       try {
@@ -34074,7 +34176,10 @@
           onBodyReady();
         }
       });
-      bodyObserver.observe(document2.documentElement, { childList: true });
+      bodyObserver.observe(document2.documentElement, {
+        childList: true,
+        subtree: true
+      });
     }
     // Cleanup the observer and remove event listeners
     cleanup() {
@@ -34162,6 +34267,7 @@
       this.singleSelection = true;
       this.subDocumentInspector = null;
       this.listening = false;
+      this.locatorCache = InspectedElementCache.getInstance();
       this.onMouseOut = /* @__PURE__ */ __name((event) => {
         elementHighlighter.clearHighlights();
       }, "onMouseOut");
@@ -34197,37 +34303,41 @@
             capture: true
           });
         }
-        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(targetElement).catch((error) => {
-          return {
-            locator: "",
-            selector: "",
-            parentFramesSelectors: []
-          };
-        });
-        elementHighlighter.highlightElement(targetElement, {
-          text: locator.replace("frameLocator('iframe').", ""),
-          textPosition: "below",
-          textWidthType: "auto",
-          pointerEvents: "none",
-          classNames: ["element-inspector-ignore"],
-          renderDocument: this.getRenderDocument(this.defaultView)
-        });
-        const elementByLocator = await this.playwrightElementSelectorGenerator.selector(selector, parentFramesSelectors).catch(() => targetElement);
-        if (elementByLocator !== target) {
-          elementHighlighter.highlightElement(elementByLocator, {
-            // highlightStyle: { outlineColor: "blue" },
-            clear: false,
+        try {
+          const { locator, selector, parentFramesSelectors, locatorRrwebId } = await this.getInspectedElementSelection(targetElement);
+          elementHighlighter.highlightElement(targetElement, {
+            text: locator.replace("frameLocator('iframe').", ""),
+            textPosition: "below",
+            textWidthType: "auto",
             pointerEvents: "none",
             classNames: ["element-inspector-ignore"],
             renderDocument: this.getRenderDocument(this.defaultView)
           });
+          if (locatorRrwebId) {
+            const element = window.checksum.timeMachine.sessionReplayer.getNodeById(locatorRrwebId);
+            if (element) {
+              elementHighlighter.highlightElement(element, {
+                // highlightStyle: { outlineColor: "blue" },
+                clear: false,
+                pointerEvents: "none",
+                classNames: ["element-inspector-ignore"],
+                renderDocument: this.getRenderDocument(this.defaultView)
+              });
+            }
+          }
+          this.hoveredElement = targetElement;
+          this.hoveredElementSelection = {
+            locator,
+            selector,
+            parentFramesSelectors
+          };
+          this.wasHoveredElementSelected = false;
+          target.addEventListener("click", this.onClick, {
+            capture: true
+          });
+        } catch (e2) {
+          console.error("Error inspecting element", e2.message);
         }
-        this.hoveredElement = targetElement;
-        this.hoveredElementSelection = { locator, selector, parentFramesSelectors };
-        this.wasHoveredElementSelected = false;
-        target.addEventListener("click", this.onClick, {
-          capture: true
-        });
       }, "onMouseOver");
       this.onClick = /* @__PURE__ */ __name(async (event) => {
         event.stopPropagation();
@@ -34261,7 +34371,10 @@
           topLevelInspector: this.topLevelInspector ?? this,
           getRenderDocument: this.getRenderDocument
         });
-        this.subDocumentInspector.start(this.singleSelection);
+        this.subDocumentInspector.start({
+          singleSelection: this.singleSelection,
+          timestamp: this.currentTimestamp
+        });
         return true;
       }, "handleSubDocument");
       this.stopSubDocumentInspector = /* @__PURE__ */ __name((clean) => {
@@ -34282,8 +34395,15 @@
     getDefaultView() {
       return this.rootDocument.nodeType === Node.DOCUMENT_NODE ? this.rootDocument.defaultView : window;
     }
-    start(singleSelection = true) {
+    start({
+      singleSelection,
+      timestamp
+    } = {
+      singleSelection: true
+    }) {
       this.singleSelection = singleSelection;
+      this.locatorCache.setTimestamp(timestamp);
+      this.currentTimestamp = timestamp;
       this.stop();
       this.cleanSelection();
       this.rootDocument.addEventListener("mouseover", this.onMouseOver);
@@ -34304,6 +34424,7 @@
           capture: true
         });
       }
+      this.currentTimestamp = void 0;
       this.hoveredElement = null;
       this.wasHoveredElementSelected = false;
       this.rootDocument.removeEventListener("mouseover", this.onMouseOver);
@@ -34325,7 +34446,78 @@
       this.cleanSelection();
       return selected;
     }
+    /**
+     * Gets selection data for element.
+     * Tried to fetch from cache first, if not found, generates new data, saves it to cache and returns it.
+     */
+    async getInspectedElementSelection(element) {
+      let cache = this.locatorCache.getCachedLocatorForElement(element);
+      if (!cache) {
+        const { locator, selector, parentFramesSelectors } = await this.playwrightElementSelectorGenerator.getSelectorAndLocator(element).catch((error) => {
+          return {
+            locator: "",
+            selector: "",
+            parentFramesSelectors: []
+          };
+        });
+        const locatorElement = await this.playwrightElementSelectorGenerator.selector(selector, parentFramesSelectors).catch(() => element);
+        const locatorRrwebId = locatorElement !== element ? getNodeRrwebId(locatorElement) : void 0;
+        cache = {
+          locator,
+          selector,
+          parentFramesSelectors,
+          locatorRrwebId
+        };
+        this.locatorCache.setCachedLocatorForElement(element, cache);
+      }
+      return cache;
+    }
   };
+  var InspectedElementCache = class _InspectedElementCache {
+    constructor() {
+      this.locatorCache = /* @__PURE__ */ new Map();
+    }
+    static {
+      __name(this, "InspectedElementCache");
+    }
+    // key - rrwebid_timestamp
+    static getInstance() {
+      if (!_InspectedElementCache.instance) {
+        _InspectedElementCache.instance = new _InspectedElementCache();
+      }
+      return _InspectedElementCache.instance;
+    }
+    setTimestamp(timestamp) {
+      this.currentTimestamp = timestamp;
+    }
+    getCachedLocatorForElement(element) {
+      try {
+        if (!this.currentTimestamp) {
+          return;
+        }
+        return this.locatorCache.get(this.getKeyForElement(element));
+      } catch (e2) {
+        return;
+      }
+    }
+    setCachedLocatorForElement(element, cache) {
+      if (!this.currentTimestamp) {
+        return;
+      }
+      this.locatorCache.set(this.getKeyForElement(element), cache);
+    }
+    getKeyForElement(element) {
+      const rrwebId = getNodeRrwebId(element);
+      if (!rrwebId) {
+        throw new Error("Can't find rrwebId for element");
+      }
+      return `${rrwebId}_${this.currentTimestamp}`;
+    }
+  };
+  function getNodeRrwebId(node2) {
+    return window.checksum.timeMachine.sessionReplayer.getMeta(node2)?.id;
+  }
+  __name(getNodeRrwebId, "getNodeRrwebId");
 
   // src/lib/test-generator/assertions-observer/keybindings-manager.ts
   var import_mousetrap = __toESM(require_mousetrap());
@@ -34598,7 +34790,6 @@ ${data.locator}`
           event.isCheckout = isCheckout;
           window.checksumSendBroadcastMessage?.("rrweb", [event]);
           this.lastRrwebEventTimestamp = event.timestamp;
-          console.log(event.timestamp);
         }, config.recordOptions);
       }
       if (initFilesObserver) {
@@ -35424,6 +35615,7 @@ ${data.locator}`
     constructor() {
       super({ enableInteract: true });
       this.shouldHandleEvents = true;
+      this.name = "timeMachine";
     }
     static {
       __name(this, "TimeMachine");
@@ -35455,13 +35647,16 @@ ${data.locator}`
       if (!timestamp) {
         return this.goLive();
       }
-      return this.sessionReplayer.goBack(timestamp, options);
+      return this.sessionReplayer.goBack(timestamp);
     }
     getElementByRRwebId(rrwebId) {
       return this.sessionReplayer.getNodeById(rrwebId);
     }
     goLive() {
       return this.sessionReplayer.goLive();
+    }
+    getCurrentTimestamp() {
+      return this.sessionReplayer.getCurrentTimestamp();
     }
   };
 
@@ -36108,7 +36303,11 @@ ${data.locator}`
     setSendRecordedSteps(sendRecordedSteps) {
       this.sendRecordedSteps = sendRecordedSteps;
     }
-    startInspector(singleSelection = true, rootDocument) {
+    startInspector({
+      singleSelection = true,
+      rootDocument,
+      timestamp
+    } = {}) {
       this.stopInspector();
       const getRenderDocument = /* @__PURE__ */ __name((defaultView) => {
         return defaultView.top.document.querySelector(
@@ -36119,7 +36318,7 @@ ${data.locator}`
         rootDocument: rootDocument ?? this.getRRwebReplayerDocument(),
         getRenderDocument
       });
-      this.elementInspector.start(singleSelection);
+      this.elementInspector.start({ singleSelection, timestamp });
     }
     getRRwebReplayerDocument() {
       return document.querySelector(".replayer-wrapper > iframe").contentDocument;
