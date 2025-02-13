@@ -22,20 +22,18 @@ export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
     : "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: "on",
+    trace:
+      "on" /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */,
     video: "on",
     screenshot: "on",
     locale: "en-US",
     timezoneId: "UTC",
     permissions: ["clipboard-read"],
-    actionTimeout: 1000 * 5, // set action timeout for 5 seconds. When an action times out, checksum's Autonomus Agent kicks in and attempts to fix the test.
-    navigationTimeout: 1000 * 30,
+    actionTimeout: 1000 * 10, // set action timeout for 10 seconds
+    navigationTimeout: 1000 * 30, // set navigation timeout for 30 seconds
   },
   expect: {
+    timeout: 1000 * 10, // set expect (assertion) timeout for 10 seconds
     toHaveScreenshot: { maxDiffPixelRatio: 0.05, maxDiffPixels: 200 },
   },
 
@@ -48,7 +46,7 @@ export default defineConfig<{ playwrightExtra?: PuppeteerExtraPlugin[] }>({
         ...devices["Desktop Chrome"],
         // To use playwright-extra plugins, import them and add them here
         // See https://github.com/berstend/puppeteer-extra/tree/master/packages/playwright-extra
-        // Example: 
+        // Example:
         // import StealthPlugin from "puppeteer-extra-plugin-stealth";
         // playwrightExtra: [StealthPlugin()],
       },
