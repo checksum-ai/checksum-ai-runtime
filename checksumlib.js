@@ -7660,7 +7660,10 @@
       this.element = element;
       this.elRect = this.element.getBoundingClientRect();
     }
-    scrollIntoView() {
+    scrollIntoView({ scrollIfNotInView = true } = {}) {
+      if (!scrollIfNotInView && isElementInViewport(this.element)) {
+        return this;
+      }
       this.getScrollableParentsPositions();
       if (!this.initialScrollPositions.length) {
         return this;
@@ -31601,7 +31604,8 @@
       shouldFlipHighlightTextOutsideViewport = true,
       pointerEvents,
       classNames = [],
-      renderDocument
+      renderDocument,
+      scroll = false
     } = {}) {
       if (clear) {
         this.clearHighlights();
@@ -31708,6 +31712,9 @@
           textPosition,
           elementBoundingBox.height
         );
+      }
+      if (scroll) {
+        new ScrollHelper(element).scrollIntoView({ scrollIfNotInView: false });
       }
     }
     mergeStyle(element, styles) {
@@ -35610,6 +35617,143 @@ ${data.locator}`
     }
   };
 
+  // ../browser-lib/src/time-machine/time-machine-seeker.ts
+  var TimeMachineSeeker = class {
+    constructor(timeMachine) {
+      this.timeMachine = timeMachine;
+      this.seekbarMin = Date.now();
+      this.seekbarMax = Date.now();
+      this.listeningToTimeMachine = false;
+    }
+    static {
+      __name(this, "TimeMachineSeeker");
+    }
+    open() {
+      const existingSeekbar = document.getElementById("time-machine-seekbar");
+      if (existingSeekbar) {
+        existingSeekbar.remove();
+      }
+      this.seekbarMax = Date.now();
+      console.log(
+        "Creating seekbar with min/max timestamp",
+        this.seekbarMin,
+        this.seekbarMax
+      );
+      console.log("Current timestamp", this.timeMachine.getCurrentTimestamp());
+      const minTimestamp = 0;
+      const maxTimestamp = 1;
+      const step = 1e-3;
+      const container2 = document.createElement("div");
+      container2.id = "time-machine-seekbar";
+      container2.style.position = "absolute";
+      container2.style.width = "90%";
+      container2.style.bottom = "0";
+      container2.style.background = "white";
+      container2.style.opacity = "0.75";
+      container2.style.display = "flex";
+      container2.style.justifyContent = "center";
+      container2.style.alignItems = "center";
+      container2.style.padding = "10px";
+      container2.style.margin = "0 20px";
+      container2.style.gap = "10px";
+      const seekBar = document.createElement("input");
+      seekBar.type = "range";
+      seekBar.min = minTimestamp.toString();
+      seekBar.max = maxTimestamp.toString();
+      seekBar.step = step.toString();
+      seekBar.value = seekBar.max;
+      seekBar.style.flexGrow = "1";
+      const label = document.createElement("span");
+      label.textContent = this.formatTimestamp(this.seekbarMax);
+      const button = document.createElement("button");
+      button.textContent = "Refresh";
+      button.addEventListener("click", () => {
+        this.open();
+      });
+      container2.appendChild(seekBar);
+      container2.appendChild(label);
+      container2.appendChild(button);
+      seekBar.addEventListener("input", () => {
+        const percentage = parseFloat(seekBar.value);
+        const timestamp = this.getTimestamp(percentage);
+        console.log("Seeking to timestamp", timestamp);
+        label.textContent = this.formatTimestamp(timestamp);
+        this.timeMachine.goBack(timestamp);
+      });
+      document.body.appendChild(container2);
+      this.addTMListeners();
+    }
+    getTimestamp(percentage) {
+      const ts = Math.round(
+        this.seekbarMin + percentage * (this.seekbarMax - this.seekbarMin)
+      );
+      if (ts > this.seekbarMax) {
+        return this.seekbarMax;
+      }
+      if (ts < this.seekbarMin) {
+        return this.seekbarMin;
+      }
+      return ts;
+    }
+    formatTimestamp(timestamp) {
+      let diffInSeconds = Math.max(
+        0,
+        Math.floor((timestamp - this.seekbarMin) / 1e3)
+      );
+      let minutes = Math.floor(diffInSeconds / 60);
+      let seconds = diffInSeconds % 60;
+      let formattedTime = `${String(minutes).padStart(2, "0")}:${String(
+        seconds
+      ).padStart(2, "0")}`;
+      return formattedTime;
+    }
+    addTMListeners() {
+      if (this.listeningToTimeMachine) {
+        return;
+      }
+      this.listeningToTimeMachine = true;
+      this.timeMachine.sessionReplayer.replayerListenersManager?.addListener(
+        (state) => {
+          if (state === "Processing" /* Processing */) {
+            this.showTimeMachineLoading();
+          } else {
+            this.hideTimeMachineLoading();
+          }
+        }
+      );
+    }
+    showTimeMachineLoading() {
+      const container2 = document.createElement("div");
+      container2.id = "time-machine-loading";
+      container2.style.position = "absolute";
+      container2.style.width = "100%";
+      container2.style.height = "100%";
+      container2.style.top = "0";
+      container2.style.left = "0";
+      container2.style.background = "black";
+      container2.style.opacity = "0.65";
+      container2.style.display = "flex";
+      container2.style.justifyContent = "center";
+      container2.style.alignItems = "center";
+      const loading = document.createElement("div");
+      loading.style.color = "white";
+      loading.style.fontSize = "20px";
+      loading.style.cursor = "pointer";
+      loading.textContent = "Loading (if stuck, click here)...";
+      loading.addEventListener("click", () => {
+        this.hideTimeMachineLoading();
+      });
+      container2.appendChild(loading);
+      document.body.appendChild(container2);
+    }
+    hideTimeMachineLoading() {
+      const container2 = document.getElementById("time-machine-loading");
+      if (container2) {
+        container2.remove();
+      }
+    }
+  };
+
   // ../browser-lib/src/time-machine/time-machine.ts
   var TimeMachine = class extends Streamer {
     constructor() {
@@ -35657,6 +35801,12 @@ ${data.locator}`
     }
     getCurrentTimestamp() {
       return this.sessionReplayer.getCurrentTimestamp();
+    }
+    openSeekbar() {
+      if (!this.seeker) {
+        this.seeker = new TimeMachineSeeker(this);
+      }
+      this.seeker.open();
     }
   };
 

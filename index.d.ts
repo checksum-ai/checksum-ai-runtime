@@ -265,12 +265,22 @@ export function getLogin(): (
 export function getChecksumConfig(
   config: Partial<ChecksumConfig>
 ): ChecksumConfig;
+export type ExecuteCodeCallback = (err: any, result: any) => void;
 
+export type ExecuteCodeListener = (
+  code: string,
+  callback: ExecuteCodeCallback
+) => void;
+
+export interface IVisualTestGenerator {
+  eval: (listener: ExecuteCodeListener) => Promise<void>;
+}
 type ChecksumPlaywrightTestArgs = Omit<PlaywrightTestArgs, "page"> & {
   page: IChecksumPage;
   variablesStore: IVariableStore;
   variableStore: IVariableStore;
   vs: IVariableStore;
+  vtg: IVisualTestGenerator;
 };
 
 type ChecksumTestType<TestArgs> = TestType<
