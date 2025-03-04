@@ -8307,7 +8307,7 @@
   var sanitizeStaticMetadata = /* @__PURE__ */ __name((metadata) => {
     return Object.keys(metadata || {}).reduce((sanitized, key) => {
       const value = metadata[key];
-      if (!!value) {
+      if (value) {
         sanitized[key] = value;
       }
       return sanitized;
@@ -8333,7 +8333,7 @@
     if (!staticKeys1.every((val, i2) => val === staticKeys2[i2])) {
       return false;
     }
-    for (let type in sanitizedStaticMetadata1) {
+    for (const type in sanitizedStaticMetadata1) {
       if (sanitizedStaticMetadata1[type] !== sanitizedStaticMetadata2[type]) {
         return false;
       }
@@ -8398,11 +8398,14 @@
     }
     const r2 = [], max = args.length - 1;
     function helper(arr, i2) {
-      for (var j = 0, l2 = args[i2].length; j < l2; j++) {
-        var a2 = arr.slice(0);
+      for (let j = 0, l2 = args[i2].length; j < l2; j++) {
+        const a2 = arr.slice(0);
         a2.push(args[i2][j]);
-        if (i2 === max) r2.push(a2);
-        else helper(a2, i2 + 1);
+        if (i2 === max) {
+          r2.push(a2);
+        } else {
+          helper(a2, i2 + 1);
+        }
       }
     }
     __name(helper, "helper");
@@ -9546,6 +9549,76 @@
 
   // ../browser-lib/src/selector-generators/playwright-element-selector-generator.ts
   var import_await_sleep = __toESM(require_await_sleep());
+
+  // ../browser-lib/src/helpers/dom/constants.ts
+  var InteractableElementsSelectors = [
+    "button",
+    "select",
+    "input",
+    "textarea",
+    "option",
+    "a",
+    "[role=button]",
+    "[role=checkbox]",
+    "[role=radio]",
+    "[role=link]",
+    "[type=button]",
+    "[aria-disabled=false]",
+    '[id^="react-select"]',
+    "label[for]",
+    "canvas"
+  ];
+  var InteractableCursorValues = [
+    "pointer",
+    "grab",
+    "text",
+    "vertical-text",
+    "zoom-in",
+    "zoom-out",
+    "help"
+  ];
+  var ReactJSInteractableEventHandlerProps = [
+    "onClick",
+    "onMouseDown",
+    "onKeyDown",
+    "onKeyPress",
+    "onInput",
+    "onSelect",
+    "onDoubleClick",
+    "onDragStart",
+    "onDrag",
+    "onDragEnd",
+    "onDragOver",
+    "onDrop",
+    "onToggle",
+    "onMouseEnter"
+  ];
+  var HtmlElementInteractableEventHandlerFields = [
+    "onclick",
+    "onmousedown",
+    "onkeydown",
+    "onkeypress",
+    "oninput",
+    "onselect",
+    "ondblclick",
+    "ondragstart",
+    "ondrag",
+    "ondragend",
+    "ondragover",
+    "ondrop",
+    "ontoggle",
+    "onmouseenter"
+  ];
+  var RRWEB_CLASS_IGNORE_LIST = [
+    ":hover",
+    ":focus",
+    ":active",
+    "\\:hover",
+    "\\:focus",
+    "\\:active"
+  ];
+
+  // ../browser-lib/src/selector-generators/playwright-element-selector-generator.ts
   var PlaywrightElementSelectorGenerator = class {
     static {
       __name(this, "PlaywrightElementSelectorGenerator");
@@ -9633,7 +9706,9 @@
       try {
         originalClasses = nodeHTML.getAttribute("class");
         if (originalClasses && typeof originalClasses === "string") {
-          const filteredClasses = originalClasses.split(" ").filter((cls) => !cls.startsWith("css-") && !cls.startsWith("jss-")).join(" ");
+          const filteredClasses = originalClasses.split(" ").filter(
+            (cls) => !cls.startsWith("css-") && !cls.startsWith("jss-") && !RRWEB_CLASS_IGNORE_LIST.includes(cls)
+          ).join(" ");
           nodeHTML.setAttribute("class", filteredClasses);
         } else {
           originalClasses = void 0;
@@ -10335,66 +10410,6 @@
     }
     return console.timeEnd(name);
   }, "consoleTimeEnd");
-
-  // ../browser-lib/src/helpers/dom/constants.ts
-  var InteractableElementsSelectors = [
-    "button",
-    "select",
-    "input",
-    "textarea",
-    "option",
-    "a",
-    "[role=button]",
-    "[role=checkbox]",
-    "[role=radio]",
-    "[role=link]",
-    "[type=button]",
-    "[aria-disabled=false]",
-    '[id^="react-select"]',
-    "label[for]",
-    "canvas"
-  ];
-  var InteractableCursorValues = [
-    "pointer",
-    "grab",
-    "text",
-    "vertical-text",
-    "zoom-in",
-    "zoom-out",
-    "help"
-  ];
-  var ReactJSInteractableEventHandlerProps = [
-    "onClick",
-    "onMouseDown",
-    "onKeyDown",
-    "onKeyPress",
-    "onInput",
-    "onSelect",
-    "onDoubleClick",
-    "onDragStart",
-    "onDrag",
-    "onDragEnd",
-    "onDragOver",
-    "onDrop",
-    "onToggle",
-    "onMouseEnter"
-  ];
-  var HtmlElementInteractableEventHandlerFields = [
-    "onclick",
-    "onmousedown",
-    "onkeydown",
-    "onkeypress",
-    "oninput",
-    "onselect",
-    "ondblclick",
-    "ondragstart",
-    "ondrag",
-    "ondragend",
-    "ondragover",
-    "ondrop",
-    "ontoggle",
-    "onmouseenter"
-  ];
 
   // ../browser-lib/src/helpers/dom/compoundable-root-element.ts
   var getCompoundInteractableRootElement = /* @__PURE__ */ __name((element, appSpecificInteractableElementsSelectors = []) => {
@@ -29463,10 +29478,93 @@
     }
   };
 
+  // ../browser-lib/src/helpers/rrweb/rrweb-events.ts
+  var eventTypeMap = {
+    [EventType.DomContentLoaded]: "DomContentLoaded",
+    [EventType.Load]: "Load",
+    [EventType.FullSnapshot]: "FullSnapshot",
+    [EventType.IncrementalSnapshot]: "IncrementalSnapshot",
+    [EventType.Meta]: "Meta",
+    [EventType.Custom]: "Custom",
+    [EventType.Plugin]: "Plugin"
+  };
+  var incrementalSourceMap = {
+    [IncrementalSource.Mutation]: "Mutation",
+    [IncrementalSource.MouseMove]: "MouseMove",
+    [IncrementalSource.MouseInteraction]: "MouseInteraction",
+    [IncrementalSource.Scroll]: "Scroll",
+    [IncrementalSource.ViewportResize]: "ViewportResize",
+    [IncrementalSource.Input]: "Input",
+    [IncrementalSource.TouchMove]: "TouchMove",
+    [IncrementalSource.MediaInteraction]: "MediaInteraction",
+    [IncrementalSource.StyleSheetRule]: "StyleSheetRule",
+    [IncrementalSource.CanvasMutation]: "CanvasMutation",
+    [IncrementalSource.Font]: "Font",
+    [IncrementalSource.Log]: "Log",
+    [IncrementalSource.Drag]: "Drag",
+    [IncrementalSource.StyleDeclaration]: "StyleDeclaration"
+  };
+  var mouseInteractionMap = {
+    [MouseInteractions.MouseUp]: "MouseUp",
+    [MouseInteractions.MouseDown]: "MouseDown",
+    [MouseInteractions.Click]: "Click",
+    [MouseInteractions.ContextMenu]: "ContextMenu",
+    [MouseInteractions.DblClick]: "DblClick",
+    [MouseInteractions.Focus]: "Focus",
+    [MouseInteractions.Blur]: "Blur",
+    [MouseInteractions.TouchStart]: "TouchStart",
+    [MouseInteractions.TouchMove_Departed]: "TouchMove_Departed",
+    [MouseInteractions.TouchEnd]: "TouchEnd"
+  };
+  var stringifyEvent = /* @__PURE__ */ __name((event) => ({
+    ...event,
+    type: eventTypeMap[event.type],
+    data: {
+      ...event.data,
+      source: event.type === EventType.IncrementalSnapshot ? incrementalSourceMap[event.data.source] ?? event.data.source : event.data.source,
+      type: event.data.source === IncrementalSource.MouseInteraction ? mouseInteractionMap[event.data.type] : event.data.type
+    }
+  }), "stringifyEvent");
+  var isActionEvent = /* @__PURE__ */ __name((event, { includeBlur = true, includeFocus = true } = {}) => {
+    switch (event.type) {
+      case EventType.Meta:
+        return false;
+      case EventType.IncrementalSnapshot:
+        switch (event.data.source) {
+          case IncrementalSource.Input:
+            return event.data.userTriggered;
+          case IncrementalSource.MouseInteraction:
+            if (!includeBlur && event.data.type === MouseInteractions.Blur) {
+              return false;
+            }
+            if (!includeFocus && event.data.type === MouseInteractions.Focus) {
+              return false;
+            }
+            return true;
+          case IncrementalSource.MouseMove:
+          case IncrementalSource.Drag:
+          case IncrementalSource.Selection:
+            return true;
+          default:
+            return false;
+        }
+      case EventType.Custom:
+        switch (event.data.tag) {
+          case "contenteditable-input" /* ContentEditableInput */:
+            return true;
+          default:
+            return false;
+        }
+      default:
+        return false;
+    }
+  }, "isActionEvent");
+
   // ../browser-lib/src/session-record-replay/session-replayer.ts
   var DEBUG_MODE = false;
   var SessionReplayer = class {
     constructor(config = {}) {
+      this.interactionEventsTimestamps = [];
       this.initialEventsBuffer = [];
       this.config = {
         enableInteract: false
@@ -29498,6 +29596,17 @@
       this.getMeta = /* @__PURE__ */ __name((node2) => {
         return this.replayer?.getMirror()?.getMeta(node2);
       }, "getMeta");
+      /**
+       * Gets the last event timestamp before the given timestamp
+       * Used by replayer to sync action with correct event timestamp
+       *
+       * @param timestamp - timestamp to get the last event timestamp before it
+       * @returns last event timestamp before or in the given timestamp
+       */
+      this.getLastEventTimestamp = /* @__PURE__ */ __name((timestamp) => {
+        const event = this.interactionEventsTimestamps.sort((a2, b) => a2.timestamp - b.timestamp).reverse().find((e2) => e2.timestamp <= timestamp);
+        return event?.timestamp;
+      }, "getLastEventTimestamp");
       // store each event for debug and check ids of events and timestamps, if one exists
       this.debugData = {
         active: false,
@@ -29570,8 +29679,8 @@
         const currentTime = this.replayer.getCurrentTime();
         if (targetTime && currentTime >= targetTime) {
           console.log(
-            `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}`,
-            Date.now()
+            `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}, event timestamp:`,
+            this.firstEvent.timestamp + currentTime
           );
           onTargetHook();
           stopTimer();
@@ -29631,6 +29740,12 @@
           this.lastSnapshot = event;
         }
         this.replayer.addEvent(event);
+        if (isActionEvent(event, {
+          includeBlur: false,
+          includeFocus: false
+        })) {
+          this.interactionEventsTimestamps.push(event);
+        }
         this.lastEvent = event;
         this.storeEvent(event);
       }
@@ -29643,7 +29758,7 @@
       });
     }
     async goBack(timestamp, {
-      sleepAfter = 1e3,
+      sleepAfter = 100,
       beforeTimestamp = false,
       includeAllMatchingTimestamps = false
     } = {}) {
@@ -29670,6 +29785,8 @@
       this.debugData.active = true;
       window.__chkreplayer = {
         events: /* @__PURE__ */ __name(() => this.debugData.events, "events"),
+        stringifyEvents: /* @__PURE__ */ __name(() => this.debugData.events.map(stringifyEvent), "stringifyEvents"),
+        stringifyActionEvents: /* @__PURE__ */ __name(() => this.debugData.events.filter((e2) => isActionEvent(e2)).map(stringifyEvent), "stringifyActionEvents"),
         back: /* @__PURE__ */ __name((ts) => this.goBack(ts), "back"),
         currentTime: /* @__PURE__ */ __name(() => this.replayer.getCurrentTime(), "currentTime"),
         castedEvents: /* @__PURE__ */ __name(() => this.debugData.castedEvents, "castedEvents")
@@ -33106,7 +33223,7 @@
         }
       }
       for (const className of Array.from(this.targetElement.classList).filter(
-        (cls) => !CLASS_IGNORE_LIST.includes(cls)
+        (cls) => !RRWEB_CLASS_IGNORE_LIST.includes(cls)
       )) {
         const selector = addCSSFilterToLocator(`.${escapeSelector(className)}`);
         try {
@@ -33186,7 +33303,7 @@
         }
       }
       for (const className of Array.from(element.classList).filter(
-        (cls) => !CLASS_IGNORE_LIST.includes(cls)
+        (cls) => !RRWEB_CLASS_IGNORE_LIST.includes(cls)
       )) {
         try {
           const selector = `.${escapeSelector(className)}`;
@@ -33522,14 +33639,6 @@
   __name(findElementsByXPath, "findElementsByXPath");
 
   // src/lib/test-generator/selectors/compound-selector.ts
-  var CLASS_IGNORE_LIST = [
-    ":hover",
-    ":focus",
-    ":active",
-    "\\:hover",
-    "\\:focus",
-    "\\:active"
-  ];
   var CompoundSelector = class {
     constructor(htmlReducer) {
       this.htmlReducer = htmlReducer;
@@ -33828,7 +33937,7 @@
           innerText: this.innerTextExtractor.extract(se.element),
           innerFeatures: this.innerFeaturesExtractor.extract(se.element),
           classes: Array.from(se.element.classList).filter(
-            (cls) => !CLASS_IGNORE_LIST.includes(cls)
+            (cls) => !RRWEB_CLASS_IGNORE_LIST.includes(cls)
           ) || [],
           attributes: Array.from(se.element.attributes).reduce((acc, attr) => {
             if (!["class", "style", "id"].includes(attr.name)) {
@@ -33895,7 +34004,7 @@
       }
       let selector = useTag ? element.tagName.toLowerCase() : "";
       if (useClasses && element.className) {
-        const classesString = element.className.trim().split(/\s+/).filter((cls) => !CLASS_IGNORE_LIST.includes(cls)).map(escapeSelector).join(".");
+        const classesString = element.className.trim().split(/\s+/).filter((cls) => !RRWEB_CLASS_IGNORE_LIST.includes(cls)).map(escapeSelector).join(".");
         if (classesString.length > 0) {
           selector += "." + classesString;
         }
@@ -34066,6 +34175,7 @@
           );
           attributeMaxSize = Math.max(attributeMaxSize - 10, 0);
         } while (rootClone.outerHTML.length > this.MAX_SNIPPET_SIZE && attributeMaxSize > 0);
+        this.filterNodeClasses(rootClone);
         let htmlSnippet = serializeElement(rootClone, {
           limitAttributeLength: true
         });
@@ -34101,6 +34211,24 @@
         }
       }
       return clone;
+    }
+    filterNodeClasses(node2) {
+      const filterClasses = /* @__PURE__ */ __name((node3) => {
+        if ("classList" in node3) {
+          const element = node3;
+          const classes = element.classList;
+          for (let i2 = 0; i2 < classes.length; i2++) {
+            const className = classes[i2];
+            if (RRWEB_CLASS_IGNORE_LIST.includes(className)) {
+              element.classList.remove(className);
+            }
+          }
+          for (let i2 = 0; i2 < element.children.length; i2++) {
+            filterClasses(element.children[i2]);
+          }
+        }
+      }, "filterClasses");
+      filterClasses(node2);
     }
   };
 
@@ -36011,6 +36139,7 @@ ${data.locator}`
   };
 
   // ../browser-lib/src/visual-test-generator/time-machine-event-handlers.ts
+  var LOG_DEBUG = false;
   var VisualTestGenerationTimeMachineEventHandlers = class extends EventHandlersBase {
     constructor(onStep) {
       super();
@@ -36024,6 +36153,7 @@ ${data.locator}`
       this.inputFilter = void 0;
       this.clickFilter = void 0;
       this.releasePendingInputAction = /* @__PURE__ */ __name(() => {
+        this.log("releasePendingInputAction", this.inputFilter);
         clearTimeout(this.inputFilter.timeout);
         this.addStep({
           step: this.inputFilter.action,
@@ -36032,7 +36162,15 @@ ${data.locator}`
         this.inputFilter = void 0;
       }, "releasePendingInputAction");
       this.releasePendingClickActions = /* @__PURE__ */ __name((addInteractions = true) => {
-        clearTimeout(this.clickFilter.timeout);
+        this.log(
+          "releasePendingClickActions",
+          Date.now(),
+          { addInteractions },
+          this.clickFilter
+        );
+        if (this.clickFilter) {
+          clearTimeout(this.clickFilter.timeout);
+        }
         if (addInteractions) {
           this.clickFilter.actions.forEach(
             (action) => this.addStep({ step: action, type: "action" /* Action */ })
@@ -36108,6 +36246,11 @@ ${data.locator}`
     static {
       __name(this, "VisualTestGenerationTimeMachineEventHandlers");
     }
+    log(...args) {
+      if (LOG_DEBUG) {
+        console.log(...args);
+      }
+    }
     setSessionReplayer() {
       const liveTMDiv = window.parent.document.createElement("div");
       liveTMDiv.classList.add("live-tm");
@@ -36126,10 +36269,10 @@ ${data.locator}`
     }
     // -------- [Events Lifecycle] -------- //
     preEvent(event) {
-      if (!!this.inputFilter && this.isActionEvent(event) && !this.isConsecutiveInputEvent(event)) {
+      if (!!this.inputFilter && isActionEvent(event) && !this.isConsecutiveInputEvent(event)) {
         this.releasePendingInputAction();
       }
-      if (!!this.clickFilter && this.isActionEvent(event) && !this.isConsecutiveClickEvent(event)) {
+      if (!!this.clickFilter && isActionEvent(event) && !this.isConsecutiveMouseInteractionEvent(event)) {
         this.releasePendingClickActions();
       }
       this.events.push(event);
@@ -36175,6 +36318,9 @@ ${data.locator}`
           timeout: this.setInputWaitTimeout()
         };
         return;
+      }
+      if (action.eventCode === "selectoption" /* SelectOption */) {
+        action.fillValue = data.text;
       }
       if (action.eventCode === "upload_files" /* UploadFiles */) {
         action.files = [];
@@ -36252,7 +36398,9 @@ ${data.locator}`
         return;
       }
       const action = this.makePageAction("click" /* Click */, event, selector);
+      this.log("handleClick", Date.now(), action);
       if (this.clickFilter) {
+        this.log("handleClick", "adding to filter");
         this.clickFilter.actions.push(action);
         return;
       }
@@ -36262,16 +36410,17 @@ ${data.locator}`
         timeout: this.setClickWaitTimeout()
       };
     }
-    isConsecutiveClickEvent(event) {
+    isConsecutiveMouseInteractionEvent(event) {
       if (!this.clickFilter) {
         return false;
       }
-      return event.type === EventType.IncrementalSnapshot && event.data.source === IncrementalSource.MouseInteraction && event.data.type === MouseInteractions.Click && event.data.id === this.clickFilter.nodeId;
+      return event.type === EventType.IncrementalSnapshot && event.data.source === IncrementalSource.MouseInteraction && event.data.id === this.clickFilter.nodeId;
     }
     setClickWaitTimeout() {
       if (this.clickFilter?.timeout) {
         clearTimeout(this.clickFilter.timeout);
       }
+      this.log("setClickWaitTimeout", Date.now());
       return setTimeout(this.releasePendingClickActions, 600);
     }
     async handleDblClick(data, event) {
@@ -36280,6 +36429,7 @@ ${data.locator}`
       }
       const { selector } = await this.getNodeAndSelector(data.id);
       const action = this.makePageAction("double_click" /* DoubleClick */, event, selector);
+      this.log("handleDblClick", action);
       this.addStep({ step: action, type: "action" /* Action */ });
       this.releasePendingClickActions(false);
     }
@@ -36305,37 +36455,13 @@ ${data.locator}`
       await this.sessionReplayer.goLive();
     }
     // -------- [General] -------- //
-    isActionEvent(event) {
-      switch (event.type) {
-        case EventType.Meta:
-          return false;
-        case EventType.IncrementalSnapshot:
-          switch (event.data.source) {
-            case IncrementalSource.Input:
-              return event.data.userTriggered;
-            case IncrementalSource.MouseInteraction:
-            case IncrementalSource.MouseMove:
-              return true;
-            default:
-              return false;
-          }
-        case EventType.Custom:
-          switch (event.data.tag) {
-            case "contenteditable-input" /* ContentEditableInput */:
-              return true;
-            default:
-              return false;
-          }
-        default:
-          return false;
-      }
-    }
     addStep(step) {
       if (step.type === "action" /* Action */ && !step.step.id) {
         step.step.id = Date.now().toString();
       }
       this.steps.push(step);
       this.lastInteractionEventIndex = this.events.length;
+      this.log("addStep", step);
       this.onStep?.(step);
     }
     makeAssertion(data, event) {
@@ -36391,6 +36517,10 @@ ${data.locator}`
       ) : node2;
     }
     getInputEventCode(node2, data) {
+      const tagName = node2.tagName.toLowerCase();
+      if (tagName === "select") {
+        return "selectoption" /* SelectOption */;
+      }
       const type = node2.getAttribute("type");
       switch (type) {
         case "file":
