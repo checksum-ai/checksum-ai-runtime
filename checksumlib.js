@@ -7651,7 +7651,7 @@
     return serializeNode2(element);
   }, "serializeElement");
 
-  // ../browser-lib/src/helpers/scrolling/element-scroll-manager.ts
+  // ../browser-lib/src/scroll-helper/element-scroll-manager.ts
   var ScrollHelper = class {
     static {
       __name(this, "ScrollHelper");
@@ -31652,7 +31652,7 @@
     return result2;
   }, "walk");
 
-  // src/lib/test-generator/nodes-distance.ts
+  // src/lib/common/nodes-distance.ts
   function findCommonAncestor(node1, node2) {
     const parents1 = /* @__PURE__ */ new Set();
     while (node1) {
@@ -31852,7 +31852,7 @@
   };
   var elementHighlighter = new ElementHighlighter();
 
-  // src/lib/test-generator/selectors/pw-injected-script-functions.js
+  // src/lib/selectors/pw-injected-script-functions.js
   function escapeForTextSelector(text, exact) {
     if (typeof text !== "string") return escapeRegexForSelector(text);
     return `${JSON.stringify(text)}${exact ? "s" : "i"}`;
@@ -31917,7 +31917,7 @@
   }
   __name(shouldSkipForTextMatching, "shouldSkipForTextMatching");
 
-  // src/lib/test-generator/selectors/helpers.ts
+  // src/lib/selectors/helpers.ts
   function escapeSelector(selector) {
     return selector.trim().replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
   }
@@ -32648,7 +32648,7 @@
     return res;
   }, "guardReturn");
 
-  // src/lib/test-generator/selectors/pw-custom-locator-generator.ts
+  // src/lib/selectors/pw-custom-locator-generator.ts
   var DEBUG_MODE2 = false;
   var LocatorChain = class _LocatorChain {
     constructor(locators) {
@@ -33638,7 +33638,7 @@
   }
   __name(findElementsByXPath, "findElementsByXPath");
 
-  // src/lib/test-generator/selectors/compound-selector.ts
+  // src/lib/selectors/compound-selector.ts
   var CompoundSelector = class {
     constructor(htmlReducer) {
       this.htmlReducer = htmlReducer;
@@ -34232,7 +34232,7 @@
     }
   };
 
-  // src/lib/test-generator/files-observer.ts
+  // src/lib/recording/files-observer.ts
   var FilesObserver = class {
     static {
       __name(this, "FilesObserver");
@@ -34346,7 +34346,7 @@
     });
   }, "convertFileToBase64");
 
-  // src/lib/test-generator/native-dialog-observer.ts
+  // src/lib/recording/native-dialog-observer.ts
   var NativeDialogObserver = class {
     constructor(sessionRecorder) {
       this.sessionRecorder = sessionRecorder;
@@ -34654,7 +34654,7 @@
   }
   __name(getNodeRrwebId, "getNodeRrwebId");
 
-  // src/lib/test-generator/assertions-observer/keybindings-manager.ts
+  // src/lib/common/keybindings-manager.ts
   var import_mousetrap = __toESM(require_mousetrap());
   var KeybindingsManager = class {
     constructor() {
@@ -34679,7 +34679,7 @@
     }
   };
 
-  // src/lib/test-generator/assertions-observer/assertions-observer.ts
+  // src/lib/recording/assertions-recording-observer/assertions-observer.ts
   var AssertionsObserver = class {
     /**
      *  Constructor adds keybindings listeners for creating assertions.
@@ -35703,48 +35703,6 @@ ${data.locator}`
     // }
   };
 
-  // src/lib/benchmark/goal-tracker.ts
-  var GoalTracker = class {
-    static {
-      __name(this, "GoalTracker");
-    }
-    constructor() {
-      this.goals = {};
-    }
-    /**
-     * This initializes the goalTracker.
-     */
-    async init() {
-    }
-    /**
-     * This function is used to record that a specific goal has been reached.
-     *
-     * @param goalName
-     */
-    recordGoalFinished(goalName) {
-      console.log(`Goal reached: ${goalName}`);
-      if (!this.goals[goalName]) {
-        this.goals[goalName] = 0;
-      }
-      this.goals[goalName] += 1;
-      window.checksumai?.capture("goal_reached", { goalName });
-    }
-    /**
-     * Returns a map indicating which goals have been reached.
-     *
-     * The keys of the map are the names of the goals,
-     * and the values are booleans indicating whether
-     * or not the goal has been reached.
-     *
-     * NOTE: This may not contain every goal. In fact as of this writing,
-     * its only going to contain goals that have been reached as true, and
-     * everything else is going to be missing.
-     */
-    getGoals() {
-      return this.goals;
-    }
-  };
-
   // ../browser-lib/src/time-machine/time-machine-seeker.ts
   var TimeMachineSeeker = class {
     constructor(timeMachine) {
@@ -36630,13 +36588,11 @@ ${data.locator}`
   if (!window.checksum) {
     const testGenerator = new ChecksumTestGenerator();
     const sessionDigester = new ChecksumSessionDigester();
-    const goalTracker = new GoalTracker();
     const timeMachine = new TimeMachine();
     const visualTestGenerator = new VisualTestGenerator(timeMachine);
     window.checksum = {
       testGenerator,
       sessionDigester,
-      goalTracker,
       timeMachine,
       visualTestGenerator
     };
