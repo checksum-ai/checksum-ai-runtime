@@ -11621,7 +11621,7 @@
   var __defProp$1 = Object.defineProperty;
   var __defNormalProp$1 = /* @__PURE__ */ __name((obj, key, value) => key in obj ? __defProp$1(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value, "__defNormalProp$1");
   var __publicField$1 = /* @__PURE__ */ __name((obj, key, value) => __defNormalProp$1(obj, typeof key !== "symbol" ? key + "" : key, value), "__publicField$1");
-  var NodeType$2 = /* @__PURE__ */ ((NodeType2) => {
+  var NodeType$3 = /* @__PURE__ */ ((NodeType2) => {
     NodeType2[NodeType2["Document"] = 0] = "Document";
     NodeType2[NodeType2["DocumentType"] = 1] = "DocumentType";
     NodeType2[NodeType2["Element"] = 2] = "Element";
@@ -11629,7 +11629,7 @@
     NodeType2[NodeType2["CDATA"] = 4] = "CDATA";
     NodeType2[NodeType2["Comment"] = 5] = "Comment";
     return NodeType2;
-  })(NodeType$2 || {});
+  })(NodeType$3 || {});
   var testableAccessors$1 = {
     Node: ["childNodes", "parentNode", "parentElement", "textContent"],
     ShadowRoot: ["host", "styleSheets"],
@@ -11643,6 +11643,9 @@
     MutationObserver: ["constructor"]
   };
   var untaintedBasePrototype$1 = {};
+  var isAngularZonePresent$1 = /* @__PURE__ */ __name(() => {
+    return !!globalThis.Zone;
+  }, "isAngularZonePresent$1");
   function getUntaintedPrototype$1(key) {
     if (untaintedBasePrototype$1[key])
       return untaintedBasePrototype$1[key];
@@ -11670,7 +11673,7 @@
         }
       )
     );
-    if (isUntaintedAccessors && isUntaintedMethods) {
+    if (isUntaintedAccessors && isUntaintedMethods && !isAngularZonePresent$1()) {
       untaintedBasePrototype$1[key] = defaultObj.prototype;
       return defaultObj.prototype;
     }
@@ -11837,9 +11840,13 @@
       if (!rules2) {
         return null;
       }
+      let sheetHref = s2.href;
+      if (!sheetHref && s2.ownerNode && s2.ownerNode.ownerDocument) {
+        sheetHref = s2.ownerNode.ownerDocument.location.href;
+      }
       const stringifiedRules = Array.from(
         rules2,
-        (rule2) => stringifyRule(rule2, s2.href)
+        (rule2) => stringifyRule(rule2, sheetHref)
       ).join("");
       return fixBrowserCompatibilityIssuesInCSS(stringifiedRules);
     } catch (error) {
@@ -12000,13 +12007,13 @@
   __name(is2DCanvasBlank, "is2DCanvasBlank");
   function isNodeMetaEqual(a2, b) {
     if (!a2 || !b || a2.type !== b.type) return false;
-    if (a2.type === NodeType$2.Document)
+    if (a2.type === NodeType$3.Document)
       return a2.compatMode === b.compatMode;
-    else if (a2.type === NodeType$2.DocumentType)
+    else if (a2.type === NodeType$3.DocumentType)
       return a2.name === b.name && a2.publicId === b.publicId && a2.systemId === b.systemId;
-    else if (a2.type === NodeType$2.Comment || a2.type === NodeType$2.Text || a2.type === NodeType$2.CDATA)
+    else if (a2.type === NodeType$3.Comment || a2.type === NodeType$3.Text || a2.type === NodeType$3.CDATA)
       return a2.textContent === b.textContent;
-    else if (a2.type === NodeType$2.Element)
+    else if (a2.type === NodeType$3.Element)
       return a2.tagName === b.tagName && JSON.stringify(a2.attributes) === JSON.stringify(b.attributes) && a2.isSVG === b.isSVG && a2.needBlock === b.needBlock;
     return false;
   }
@@ -12081,6 +12088,43 @@
     );
   }
   __name(absolutifyURLs, "absolutifyURLs");
+  function normalizeCssString(cssText) {
+    return cssText.replace(/(\/\*[^*]*\*\/)|[\s;]/g, "");
+  }
+  __name(normalizeCssString, "normalizeCssString");
+  function splitCssText(cssText, style) {
+    const childNodes2 = Array.from(style.childNodes);
+    const splits = [];
+    if (childNodes2.length > 1 && cssText && typeof cssText === "string") {
+      const cssTextNorm = normalizeCssString(cssText);
+      for (let i2 = 1; i2 < childNodes2.length; i2++) {
+        if (childNodes2[i2].textContent && typeof childNodes2[i2].textContent === "string") {
+          const textContentNorm = normalizeCssString(childNodes2[i2].textContent);
+          for (let j = 3; j < textContentNorm.length; j++) {
+            const bit = textContentNorm.substring(0, j);
+            if (cssTextNorm.split(bit).length === 2) {
+              const splitNorm = cssTextNorm.indexOf(bit);
+              for (let k = splitNorm; k < cssText.length; k++) {
+                if (normalizeCssString(cssText.substring(0, k)).length === splitNorm) {
+                  splits.push(cssText.substring(0, k));
+                  cssText = cssText.substring(k);
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+    splits.push(cssText);
+    return splits;
+  }
+  __name(splitCssText, "splitCssText");
+  function markCssSplits(cssText, style) {
+    return splitCssText(cssText, style).join("/* rr_split */");
+  }
+  __name(markCssSplits, "markCssSplits");
   var _id = 1;
   var tagNameRegex = new RegExp("[^a-z0-9-_:]");
   var IGNORED_NODE = -2;
@@ -12353,27 +12397,28 @@
       inlineImages,
       recordCanvas,
       keepIframeSrcFn,
-      newlyAddedElement = false
+      newlyAddedElement = false,
+      cssCaptured = false
     } = options;
     const rootId = getRootId(doc, mirror2);
     switch (n2.nodeType) {
       case n2.DOCUMENT_NODE:
         if (n2.compatMode !== "CSS1Compat") {
           return {
-            type: NodeType$2.Document,
+            type: NodeType$3.Document,
             childNodes: [],
             compatMode: n2.compatMode
             // probably "BackCompat"
           };
         } else {
           return {
-            type: NodeType$2.Document,
+            type: NodeType$3.Document,
             childNodes: []
           };
         }
       case n2.DOCUMENT_TYPE_NODE:
         return {
-          type: NodeType$2.DocumentType,
+          type: NodeType$3.DocumentType,
           name: n2.name,
           publicId: n2.publicId,
           systemId: n2.systemId,
@@ -12399,17 +12444,18 @@
           doc,
           needsMask,
           maskTextFn,
-          rootId
+          rootId,
+          cssCaptured
         });
       case n2.CDATA_SECTION_NODE:
         return {
-          type: NodeType$2.CDATA,
+          type: NodeType$3.CDATA,
           textContent: "",
           rootId
         };
       case n2.COMMENT_NODE:
         return {
-          type: NodeType$2.Comment,
+          type: NodeType$3.Comment,
           textContent: index$1.textContent(n2) || "",
           rootId
         };
@@ -12425,37 +12471,26 @@
   }
   __name(getRootId, "getRootId");
   function serializeTextNode(n2, options) {
-    var _a2;
-    const { needsMask, maskTextFn, rootId } = options;
+    const { needsMask, maskTextFn, rootId, cssCaptured } = options;
     const parent = index$1.parentNode(n2);
     const parentTagName = parent && parent.tagName;
-    let text = index$1.textContent(n2);
+    let textContent2 = "";
     const isStyle = parentTagName === "STYLE" ? true : void 0;
     const isScript = parentTagName === "SCRIPT" ? true : void 0;
-    if (isStyle && text) {
-      try {
-        if (n2.nextSibling || n2.previousSibling) {
-        } else if ((_a2 = parent.sheet) == null ? void 0 : _a2.cssRules) {
-          text = stringifyStylesheet(parent.sheet);
-        }
-      } catch (err) {
-        console.warn(
-          `Cannot get CSS styles from text's parentNode. Error: ${err}`,
-          n2
-        );
-      }
-      text = absolutifyURLs(text, getHref(options.doc));
-    }
     if (isScript) {
-      text = "SCRIPT_PLACEHOLDER";
+      textContent2 = "SCRIPT_PLACEHOLDER";
+    } else if (!cssCaptured) {
+      textContent2 = index$1.textContent(n2);
+      if (isStyle && textContent2) {
+        textContent2 = absolutifyURLs(textContent2, getHref(options.doc));
+      }
     }
-    if (!isStyle && !isScript && text && needsMask) {
-      text = maskTextFn ? maskTextFn(text, index$1.parentElement(n2)) : text.replace(/[\S]/g, "*");
+    if (!isStyle && !isScript && textContent2 && needsMask) {
+      textContent2 = maskTextFn ? maskTextFn(textContent2, index$1.parentElement(n2)) : textContent2.replace(/[\S]/g, "*");
     }
     return {
-      type: NodeType$2.Text,
-      textContent: text || "",
-      isStyle,
+      type: NodeType$3.Text,
+      textContent: textContent2 || "",
       rootId
     };
   }
@@ -12504,12 +12539,14 @@
         attributes._cssText = cssText;
       }
     }
-    if (tagName === "style" && n2.sheet && // TODO: Currently we only try to get dynamic stylesheet when it is an empty style element
-    !(n2.innerText || index$1.textContent(n2) || "").trim().length) {
-      const cssText = stringifyStylesheet(
+    if (tagName === "style" && n2.sheet) {
+      let cssText = stringifyStylesheet(
         n2.sheet
       );
       if (cssText) {
+        if (n2.childNodes.length > 1) {
+          cssText = markCssSplits(cssText, n2);
+        }
         attributes._cssText = cssText;
       }
     }
@@ -12639,7 +12676,7 @@
     } catch (e2) {
     }
     return {
-      type: NodeType$2.Element,
+      type: NodeType$3.Element,
       tagName,
       attributes,
       childNodes: [],
@@ -12659,9 +12696,9 @@
   }
   __name(lowerIfExists, "lowerIfExists");
   function slimDOMExcluded(sn, slimDOMOptions) {
-    if (slimDOMOptions.comment && sn.type === NodeType$2.Comment) {
+    if (slimDOMOptions.comment && sn.type === NodeType$3.Comment) {
       return true;
-    } else if (sn.type === NodeType$2.Element) {
+    } else if (sn.type === NodeType$3.Element) {
       if (slimDOMOptions.script && // script tag
       (sn.tagName === "script" || // (module)preload link
       sn.tagName === "link" && (sn.attributes.rel === "preload" || sn.attributes.rel === "modulepreload") && sn.attributes.as === "script" || // prefetch link
@@ -12714,7 +12751,8 @@
       onStylesheetLoad,
       stylesheetLoadTimeout = 5e3,
       keepIframeSrcFn = /* @__PURE__ */ __name(() => false, "keepIframeSrcFn"),
-      newlyAddedElement = false
+      newlyAddedElement = false,
+      cssCaptured = false
     } = options;
     let { needsMask } = options;
     let { preserveWhiteSpace = true } = options;
@@ -12741,7 +12779,8 @@
       inlineImages,
       recordCanvas,
       keepIframeSrcFn,
-      newlyAddedElement
+      newlyAddedElement,
+      cssCaptured
     });
     if (!_serializedNode) {
       console.warn(n2, "not serialized");
@@ -12750,7 +12789,7 @@
     let id;
     if (mirror2.hasNode(n2)) {
       id = mirror2.getId(n2);
-    } else if (slimDOMExcluded(_serializedNode, slimDOMOptions) || !preserveWhiteSpace && _serializedNode.type === NodeType$2.Text && !_serializedNode.isStyle && !_serializedNode.textContent.replace(/^\s+|\s+$/gm, "").length) {
+    } else if (slimDOMExcluded(_serializedNode, slimDOMOptions) || !preserveWhiteSpace && _serializedNode.type === NodeType$3.Text && !_serializedNode.textContent.replace(/^\s+|\s+$/gm, "").length) {
       id = IGNORED_NODE;
     } else {
       id = genId();
@@ -12764,15 +12803,15 @@
       onSerialize(n2);
     }
     let recordChild = !skipChild;
-    if (serializedNode.type === NodeType$2.Element) {
+    if (serializedNode.type === NodeType$3.Element) {
       recordChild = recordChild && !serializedNode.needBlock;
       delete serializedNode.needBlock;
       const shadowRootEl = index$1.shadowRoot(n2);
       if (shadowRootEl && isNativeShadowDom(shadowRootEl))
         serializedNode.isShadowHost = true;
     }
-    if ((serializedNode.type === NodeType$2.Document || serializedNode.type === NodeType$2.Element) && recordChild) {
-      if (slimDOMOptions.headWhitespace && serializedNode.type === NodeType$2.Element && serializedNode.tagName === "head") {
+    if ((serializedNode.type === NodeType$3.Document || serializedNode.type === NodeType$3.Element) && recordChild) {
+      if (slimDOMOptions.headWhitespace && serializedNode.type === NodeType$3.Element && serializedNode.tagName === "head") {
         preserveWhiteSpace = false;
       }
       const bypassOptions = {
@@ -12798,10 +12837,14 @@
         iframeLoadTimeout,
         onStylesheetLoad,
         stylesheetLoadTimeout,
-        keepIframeSrcFn
+        keepIframeSrcFn,
+        cssCaptured: false
       };
-      if (serializedNode.type === NodeType$2.Element && serializedNode.tagName === "textarea" && serializedNode.attributes.value !== void 0) ;
+      if (serializedNode.type === NodeType$3.Element && serializedNode.tagName === "textarea" && serializedNode.attributes.value !== void 0) ;
       else {
+        if (serializedNode.type === NodeType$3.Element && serializedNode.attributes._cssText !== void 0 && typeof serializedNode.attributes._cssText === "string") {
+          bypassOptions.cssCaptured = true;
+        }
         for (const childN of Array.from(index$1.childNodes(n2))) {
           const serializedChildNode = serializeNodeWithId(childN, bypassOptions);
           if (serializedChildNode) {
@@ -12824,7 +12867,7 @@
     if (parent && isShadowRoot(parent) && isNativeShadowDom(parent)) {
       serializedNode.isShadow = true;
     }
-    if (serializedNode.type === NodeType$2.Element && serializedNode.tagName === "iframe") {
+    if (serializedNode.type === NodeType$3.Element && serializedNode.tagName === "iframe") {
       onceIframeLoaded(
         n2,
         () => {
@@ -12866,7 +12909,7 @@
         iframeLoadTimeout
       );
     }
-    if (serializedNode.type === NodeType$2.Element && serializedNode.tagName === "link" && typeof serializedNode.attributes.rel === "string" && (serializedNode.attributes.rel === "stylesheet" || serializedNode.attributes.rel === "preload" && typeof serializedNode.attributes.href === "string" && extractFileExtension(serializedNode.attributes.href) === "css")) {
+    if (serializedNode.type === NodeType$3.Element && serializedNode.tagName === "link" && typeof serializedNode.attributes.rel === "string" && (serializedNode.attributes.rel === "stylesheet" || serializedNode.attributes.rel === "preload" && typeof serializedNode.attributes.href === "string" && extractFileExtension(serializedNode.attributes.href) === "css")) {
       onceStylesheetLoaded(
         n2,
         () => {
@@ -13022,43 +13065,9 @@
           }
           fixed.push(rule2);
           rule2.selectors.forEach(function(selector) {
-            if (!selector.includes(":")) {
-              return;
+            if (selector.includes(":hover")) {
+              rule2.selector += ",\n" + selector.replace(/:hover/g, ".\\:hover");
             }
-            const selectorParts = selector.replace(/\n/g, " ").split(" ");
-            const pseudoedSelectorParts = [];
-            selectorParts.forEach(function(selectorPart) {
-              const pseudos = selectorPart.match(/::?([^:]+)/g);
-              if (!pseudos) {
-                pseudoedSelectorParts.push(selectorPart);
-                return;
-              }
-              const baseSelector = selectorPart.substr(
-                0,
-                selectorPart.length - pseudos.join("").length
-              );
-              const classPseudos = pseudos.map(function(pseudo) {
-                const pseudoToCheck = pseudo.replace(/\(.*/g, "");
-                if (pseudoToCheck !== ":hover") {
-                  return pseudo;
-                }
-                if (pseudo.match(/^::/)) {
-                  return pseudo;
-                }
-                pseudo = pseudo.substr(1);
-                pseudo = pseudo.replace(/\(/g, "\\(");
-                pseudo = pseudo.replace(/\)/g, "\\)");
-                return ".\\:" + pseudo;
-              });
-              pseudoedSelectorParts.push(baseSelector + classPseudos.join(""));
-            });
-            addSelector(pseudoedSelectorParts.join(" "));
-            function addSelector(newSelector) {
-              if (newSelector && newSelector !== selector) {
-                rule2.selector += ",\n" + newSelector;
-              }
-            }
-            __name(addSelector, "addSelector");
           });
         }, "Rule")
       };
@@ -16764,19 +16773,51 @@
     };
   }
   __name(createCache, "createCache");
+  function applyCssSplits(n2, cssText, hackCss, cache) {
+    const childTextNodes = [];
+    for (const scn of n2.childNodes) {
+      if (scn.type === NodeType$3.Text) {
+        childTextNodes.push(scn);
+      }
+    }
+    const cssTextSplits = cssText.split("/* rr_split */");
+    while (cssTextSplits.length > 1 && cssTextSplits.length > childTextNodes.length) {
+      cssTextSplits.splice(-2, 2, cssTextSplits.slice(-2).join(""));
+    }
+    for (let i2 = 0; i2 < childTextNodes.length; i2++) {
+      const childTextNode = childTextNodes[i2];
+      const cssTextSection = cssTextSplits[i2];
+      if (childTextNode && cssTextSection) {
+        childTextNode.textContent = hackCss ? adaptCssForReplay(cssTextSection, cache) : cssTextSection;
+      }
+    }
+  }
+  __name(applyCssSplits, "applyCssSplits");
+  function buildStyleNode(n2, styleEl, cssText, options) {
+    const { doc, hackCss, cache } = options;
+    if (n2.childNodes.length) {
+      applyCssSplits(n2, cssText, hackCss, cache);
+    } else {
+      if (hackCss) {
+        cssText = adaptCssForReplay(cssText, cache);
+      }
+      styleEl.appendChild(doc.createTextNode(cssText));
+    }
+  }
+  __name(buildStyleNode, "buildStyleNode");
   function buildNode(n2, options) {
     var _a2;
     const { doc, hackCss, cache } = options;
     switch (n2.type) {
-      case NodeType$2.Document:
+      case NodeType$3.Document:
         return doc.implementation.createDocument(null, "", null);
-      case NodeType$2.DocumentType:
+      case NodeType$3.DocumentType:
         return doc.implementation.createDocumentType(
           n2.name || "html",
           n2.publicId,
           n2.systemId
         );
-      case NodeType$2.Element: {
+      case NodeType$3.Element: {
         const tagName = getTagName(n2);
         let node2;
         if (n2.isSVG) {
@@ -16812,12 +16853,11 @@
             specialAttributes[name] = value;
             continue;
           }
-          const isTextarea = tagName === "textarea" && name === "value";
-          const isRemoteOrDynamicCss = tagName === "style" && name === "_cssText";
-          if (isRemoteOrDynamicCss && hackCss && typeof value === "string") {
-            value = adaptCssForReplay(value, cache);
-          }
-          if ((isTextarea || isRemoteOrDynamicCss) && typeof value === "string") {
+          if (typeof value !== "string") ;
+          else if (tagName === "style" && name === "_cssText") {
+            buildStyleNode(n2, node2, value, options);
+            continue;
+          } else if (tagName === "textarea" && name === "value") {
             node2.appendChild(doc.createTextNode(value));
             n2.childNodes = [];
             continue;
@@ -16871,9 +16911,9 @@
             }
           }
           if (name === "rr_width") {
-            node2.style.width = value.toString();
+            node2.style.setProperty("width", value.toString());
           } else if (name === "rr_height") {
-            node2.style.height = value.toString();
+            node2.style.setProperty("height", value.toString());
           } else if (name === "rr_mediaCurrentTime" && typeof value === "number") {
             node2.currentTime = value;
           } else if (name === "rr_mediaState") {
@@ -16911,13 +16951,14 @@
         }
         return node2;
       }
-      case NodeType$2.Text:
-        return doc.createTextNode(
-          n2.isStyle && hackCss ? adaptCssForReplay(n2.textContent, cache) : n2.textContent
-        );
-      case NodeType$2.CDATA:
+      case NodeType$3.Text:
+        if (n2.isStyle && hackCss) {
+          return doc.createTextNode(adaptCssForReplay(n2.textContent, cache));
+        }
+        return doc.createTextNode(n2.textContent);
+      case NodeType$3.CDATA:
         return doc.createCDATASection(n2.textContent);
-      case NodeType$2.Comment:
+      case NodeType$3.Comment:
         return doc.createComment(n2.textContent);
       default:
         return null;
@@ -16945,11 +16986,11 @@
     if (n2.rootId && mirror2.getNode(n2.rootId) !== doc) {
       mirror2.replace(n2.rootId, doc);
     }
-    if (n2.type === NodeType$2.Document) {
+    if (n2.type === NodeType$3.Document) {
       doc.close();
       doc.open();
-      if (n2.compatMode === "BackCompat" && n2.childNodes && n2.childNodes[0].type !== NodeType$2.DocumentType) {
-        if (n2.childNodes[0].type === NodeType$2.Element && "xmlns" in n2.childNodes[0].attributes && n2.childNodes[0].attributes.xmlns === "http://www.w3.org/1999/xhtml") {
+      if (n2.compatMode === "BackCompat" && n2.childNodes && n2.childNodes[0].type !== NodeType$3.DocumentType) {
+        if (n2.childNodes[0].type === NodeType$3.Element && "xmlns" in n2.childNodes[0].attributes && n2.childNodes[0].attributes.xmlns === "http://www.w3.org/1999/xhtml") {
           doc.write(
             '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "">'
           );
@@ -16962,7 +17003,7 @@
       node2 = doc;
     }
     mirror2.add(node2, n2);
-    if ((n2.type === NodeType$2.Document || n2.type === NodeType$2.Element) && !skipChild) {
+    if ((n2.type === NodeType$3.Document || n2.type === NodeType$3.Element) && !skipChild) {
       for (const childN of n2.childNodes) {
         const childNode = buildNodeWithSN(childN, {
           doc,
@@ -16978,7 +17019,7 @@
         }
         if (childN.isShadow && isElement(node2) && node2.shadowRoot) {
           node2.shadowRoot.appendChild(childNode);
-        } else if (n2.type === NodeType$2.Document && childN.type == NodeType$2.Element) {
+        } else if (n2.type === NodeType$3.Document && childN.type == NodeType$3.Element) {
           const htmlElement = childNode;
           let body = null;
           htmlElement.childNodes.forEach((child) => {
@@ -17016,7 +17057,7 @@
   __name(visit, "visit");
   function handleScroll(node2, mirror2) {
     const n2 = mirror2.getMeta(node2);
-    if ((n2 == null ? void 0 : n2.type) !== NodeType$2.Element) {
+    if ((n2 == null ? void 0 : n2.type) !== NodeType$3.Element) {
       return;
     }
     const el = node2;
@@ -17066,15 +17107,6 @@
   var __defProp222 = Object.defineProperty;
   var __defNormalProp22 = /* @__PURE__ */ __name((obj, key, value) => key in obj ? __defProp222(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value, "__defNormalProp22");
   var __publicField22 = /* @__PURE__ */ __name((obj, key, value) => __defNormalProp22(obj, typeof key !== "symbol" ? key + "" : key, value), "__publicField22");
-  var NodeType$1 = /* @__PURE__ */ ((NodeType2) => {
-    NodeType2[NodeType2["Document"] = 0] = "Document";
-    NodeType2[NodeType2["DocumentType"] = 1] = "DocumentType";
-    NodeType2[NodeType2["Element"] = 2] = "Element";
-    NodeType2[NodeType2["Text"] = 3] = "Text";
-    NodeType2[NodeType2["CDATA"] = 4] = "CDATA";
-    NodeType2[NodeType2["Comment"] = 5] = "Comment";
-    return NodeType2;
-  })(NodeType$1 || {});
   var Mirror$1 = class Mirror2 {
     static {
       __name(this, "Mirror2");
@@ -20770,6 +20802,15 @@
   postcss$1.Rule;
   postcss$1.Root;
   postcss$1.Node;
+  var NodeType$1 = /* @__PURE__ */ ((NodeType2) => {
+    NodeType2[NodeType2["Document"] = 0] = "Document";
+    NodeType2[NodeType2["DocumentType"] = 1] = "DocumentType";
+    NodeType2[NodeType2["Element"] = 2] = "Element";
+    NodeType2[NodeType2["Text"] = 3] = "Text";
+    NodeType2[NodeType2["CDATA"] = 4] = "CDATA";
+    NodeType2[NodeType2["Comment"] = 5] = "Comment";
+    return NodeType2;
+  })(NodeType$1 || {});
   function parseCSSText(cssText) {
     const res = {};
     const listDelimiter = /;(?![^(]*\))/g;
@@ -21314,7 +21355,7 @@
     return child;
   }
   __name(removeChild, "removeChild");
-  var NodeType = /* @__PURE__ */ ((NodeType2) => {
+  var NodeType$2 = /* @__PURE__ */ ((NodeType2) => {
     NodeType2[NodeType2["PLACEHOLDER"] = 0] = "PLACEHOLDER";
     NodeType2[NodeType2["ELEMENT_NODE"] = 1] = "ELEMENT_NODE";
     NodeType2[NodeType2["ATTRIBUTE_NODE"] = 2] = "ATTRIBUTE_NODE";
@@ -21328,7 +21369,7 @@
     NodeType2[NodeType2["DOCUMENT_TYPE_NODE"] = 10] = "DOCUMENT_TYPE_NODE";
     NodeType2[NodeType2["DOCUMENT_FRAGMENT_NODE"] = 11] = "DOCUMENT_FRAGMENT_NODE";
     return NodeType2;
-  })(NodeType || {});
+  })(NodeType$2 || {});
   var NAMESPACES = {
     svg: "http://www.w3.org/2000/svg",
     "xlink:href": "http://www.w3.org/1999/xlink",
@@ -21563,7 +21604,13 @@
           }
         };
       } else if (newTree.tagName === "IFRAME" && name === "srcdoc") continue;
-      else oldTree.setAttribute(name, newValue);
+      else {
+        try {
+          oldTree.setAttribute(name, newValue);
+        } catch (err) {
+          console.warn(err);
+        }
+      }
     }
     for (const { name } of Array.from(oldAttributes))
       if (!(name in newAttributes)) oldTree.removeAttribute(name);
@@ -21911,7 +21958,7 @@
   function buildFromNode(node2, rrdom, domMirror, parentRRNode) {
     let rrNode;
     switch (node2.nodeType) {
-      case NodeType.DOCUMENT_NODE:
+      case NodeType$2.DOCUMENT_NODE:
         if (parentRRNode && parentRRNode.nodeName === "IFRAME")
           rrNode = parentRRNode.contentDocument;
         else {
@@ -21919,7 +21966,7 @@
           rrNode.compatMode = node2.compatMode;
         }
         break;
-      case NodeType.DOCUMENT_TYPE_NODE: {
+      case NodeType$2.DOCUMENT_TYPE_NODE: {
         const documentType = node2;
         rrNode = rrdom.createDocumentType(
           documentType.name,
@@ -21928,7 +21975,7 @@
         );
         break;
       }
-      case NodeType.ELEMENT_NODE: {
+      case NodeType$2.ELEMENT_NODE: {
         const elementNode = node2;
         const tagName = getValidTagName(elementNode);
         rrNode = rrdom.createElement(tagName);
@@ -21940,16 +21987,16 @@
         elementNode.scrollTop && (rrElement.scrollTop = elementNode.scrollTop);
         break;
       }
-      case NodeType.TEXT_NODE:
+      case NodeType$2.TEXT_NODE:
         rrNode = rrdom.createTextNode(node2.textContent || "");
         break;
-      case NodeType.CDATA_SECTION_NODE:
+      case NodeType$2.CDATA_SECTION_NODE:
         rrNode = rrdom.createCDATASection(node2.data);
         break;
-      case NodeType.COMMENT_NODE:
+      case NodeType$2.COMMENT_NODE:
         rrNode = rrdom.createComment(node2.textContent || "");
         break;
-      case NodeType.DOCUMENT_FRAGMENT_NODE:
+      case NodeType$2.DOCUMENT_FRAGMENT_NODE:
         rrNode = parentRRNode.attachShadow({ mode: "open" });
         break;
       default:
@@ -21973,7 +22020,7 @@
       if (
         // if the parentRRNode isn't a RRIFrameElement
         (parentRRNode == null ? void 0 : parentRRNode.nodeName) !== "IFRAME" && // if node isn't a shadow root
-        node2.nodeType !== NodeType.DOCUMENT_FRAGMENT_NODE
+        node2.nodeType !== NodeType$2.DOCUMENT_FRAGMENT_NODE
       ) {
         parentRRNode == null ? void 0 : parentRRNode.appendChild(rrNode);
         rrNode.parentNode = parentRRNode;
@@ -21982,8 +22029,8 @@
       if (node2.nodeName === "IFRAME") {
         const iframeDoc = node2.contentDocument;
         iframeDoc && walk2(iframeDoc, rrNode);
-      } else if (node2.nodeType === NodeType.DOCUMENT_NODE || node2.nodeType === NodeType.ELEMENT_NODE || node2.nodeType === NodeType.DOCUMENT_FRAGMENT_NODE) {
-        if (node2.nodeType === NodeType.ELEMENT_NODE && node2.shadowRoot)
+      } else if (node2.nodeType === NodeType$2.DOCUMENT_NODE || node2.nodeType === NodeType$2.ELEMENT_NODE || node2.nodeType === NodeType$2.DOCUMENT_FRAGMENT_NODE) {
+        if (node2.nodeType === NodeType$2.ELEMENT_NODE && node2.shadowRoot)
           walk2(node2.shadowRoot, rrNode);
         node2.childNodes.forEach((childNode) => walk2(childNode, rrNode));
       }
@@ -22114,6 +22161,9 @@
     MutationObserver: ["constructor"]
   };
   var untaintedBasePrototype = {};
+  var isAngularZonePresent = /* @__PURE__ */ __name(() => {
+    return !!globalThis.Zone;
+  }, "isAngularZonePresent");
   function getUntaintedPrototype(key) {
     if (untaintedBasePrototype[key])
       return untaintedBasePrototype[key];
@@ -22141,7 +22191,7 @@
         }
       )
     );
-    if (isUntaintedAccessors && isUntaintedMethods) {
+    if (isUntaintedAccessors && isUntaintedMethods && !isAngularZonePresent()) {
       untaintedBasePrototype[key] = defaultObj.prototype;
       return defaultObj.prototype;
     }
@@ -22731,6 +22781,15 @@
     ReplayerEvents2["Destroy"] = "destroy";
     return ReplayerEvents2;
   })(ReplayerEvents || {});
+  var NodeType = /* @__PURE__ */ ((NodeType2) => {
+    NodeType2[NodeType2["Document"] = 0] = "Document";
+    NodeType2[NodeType2["DocumentType"] = 1] = "DocumentType";
+    NodeType2[NodeType2["Element"] = 2] = "Element";
+    NodeType2[NodeType2["Text"] = 3] = "Text";
+    NodeType2[NodeType2["CDATA"] = 4] = "CDATA";
+    NodeType2[NodeType2["Comment"] = 5] = "Comment";
+    return NodeType2;
+  })(NodeType || {});
   function isNodeInLinkedList(n2) {
     return "__ln" in n2;
   }
@@ -22832,6 +22891,7 @@
       __publicField(this, "addedSet", /* @__PURE__ */ new Set());
       __publicField(this, "movedSet", /* @__PURE__ */ new Set());
       __publicField(this, "droppedSet", /* @__PURE__ */ new Set());
+      __publicField(this, "removesSubTreeCache", /* @__PURE__ */ new Set());
       __publicField(this, "mutationCb");
       __publicField(this, "blockClass");
       __publicField(this, "blockSelector");
@@ -22876,8 +22936,17 @@
         }, "getNextId");
         const pushAdd = /* @__PURE__ */ __name((n2) => {
           const parent = index.parentNode(n2);
-          if (!parent || !inDom(n2) || parent.tagName === "TEXTAREA") {
+          if (!parent || !inDom(n2)) {
             return;
+          }
+          let cssCaptured = false;
+          if (n2.nodeType === Node.TEXT_NODE) {
+            const parentTag = parent.tagName;
+            if (parentTag === "TEXTAREA") {
+              return;
+            } else if (parentTag === "STYLE" && this.addedSet.has(parent)) {
+              cssCaptured = true;
+            }
           }
           const parentId = isShadowRoot(parent) ? this.mirror.getId(getShadowHost(n2)) : this.mirror.getId(parent);
           const nextId = getNextId(n2);
@@ -22920,7 +22989,8 @@
             }, "onIframeLoad"),
             onStylesheetLoad: /* @__PURE__ */ __name((link, childSn) => {
               this.stylesheetManager.attachLinkElement(link, childSn);
-            }, "onStylesheetLoad")
+            }, "onStylesheetLoad"),
+            cssCaptured
           });
           if (sn) {
             adds.push({
@@ -22935,13 +23005,13 @@
           this.mirror.removeNodeFromMap(this.mapRemoves.shift());
         }
         for (const n2 of this.movedSet) {
-          if (isParentRemoved(this.removes, n2, this.mirror) && !this.movedSet.has(index.parentNode(n2))) {
+          if (isParentRemoved(this.removesSubTreeCache, n2, this.mirror) && !this.movedSet.has(index.parentNode(n2))) {
             continue;
           }
           pushAdd(n2);
         }
         for (const n2 of this.addedSet) {
-          if (!isAncestorInSet(this.droppedSet, n2) && !isParentRemoved(this.removes, n2, this.mirror)) {
+          if (!isAncestorInSet(this.droppedSet, n2) && !isParentRemoved(this.removesSubTreeCache, n2, this.mirror)) {
             pushAdd(n2);
           } else if (isAncestorInSet(this.movedSet, n2)) {
             pushAdd(n2);
@@ -23037,6 +23107,7 @@
         this.addedSet = /* @__PURE__ */ new Set();
         this.movedSet = /* @__PURE__ */ new Set();
         this.droppedSet = /* @__PURE__ */ new Set();
+        this.removesSubTreeCache = /* @__PURE__ */ new Set();
         this.movedMap = {};
         this.mutationCb(payload);
       });
@@ -23191,6 +23262,7 @@
                   id: nodeId,
                   isShadow: isShadowRoot(m.target) && isNativeShadowDom(m.target) ? true : void 0
                 });
+                processRemoves(n2, this.removesSubTreeCache);
               }
               this.mapRemoves.push(n2);
             });
@@ -23286,21 +23358,26 @@
     index.childNodes(n2).forEach((childN) => deepDelete(addsSet, childN));
   }
   __name(deepDelete, "deepDelete");
+  function processRemoves(n2, cache) {
+    const queue = [n2];
+    while (queue.length) {
+      const next = queue.pop();
+      if (cache.has(next)) continue;
+      cache.add(next);
+      index.childNodes(next).forEach((n22) => queue.push(n22));
+    }
+    return;
+  }
+  __name(processRemoves, "processRemoves");
   function isParentRemoved(removes, n2, mirror2) {
-    if (removes.length === 0) return false;
-    return _isParentRemoved(removes, n2, mirror2);
+    if (removes.size === 0) return false;
+    return _isParentRemoved(removes, n2);
   }
   __name(isParentRemoved, "isParentRemoved");
-  function _isParentRemoved(removes, n2, mirror2) {
-    let node2 = index.parentNode(n2);
-    while (node2) {
-      const parentId = mirror2.getId(node2);
-      if (removes.some((r2) => r2.id === parentId)) {
-        return true;
-      }
-      node2 = index.parentNode(node2);
-    }
-    return false;
+  function _isParentRemoved(removes, n2, _mirror2) {
+    const node2 = index.parentNode(n2);
+    if (!node2) return false;
+    return removes.has(node2);
   }
   __name(_isParentRemoved, "_isParentRemoved");
   function isAncestorInSet(set, n2) {
@@ -24672,7 +24749,7 @@
       }
     }
     patchRootIdOnNode(node2, rootId) {
-      if (node2.type !== NodeType$2.Document && !node2.rootId) node2.rootId = rootId;
+      if (node2.type !== NodeType.Document && !node2.rootId) node2.rootId = rootId;
       if ("childNodes" in node2) {
         node2.childNodes.forEach((child) => {
           this.patchRootIdOnNode(child, rootId);
@@ -27763,6 +27840,9 @@
           "html.rrweb-paused *, html.rrweb-paused *:before, html.rrweb-paused *:after { animation-play-state: paused !important; }"
         );
       }
+      if (!injectStylesRules.length) {
+        return;
+      }
       if (this.usingVirtualDom) {
         const styleEl = this.virtualDom.createElement("style");
         this.virtualDom.mirror.add(
@@ -27797,7 +27877,7 @@
           collectedDialogs.add(builtNode);
         this.collectIframeAndAttachDocument(collectedIframes, builtNode);
         const sn = mirror2.getMeta(builtNode);
-        if ((sn == null ? void 0 : sn.type) === NodeType$2.Element && (sn == null ? void 0 : sn.tagName.toUpperCase()) === "HTML") {
+        if ((sn == null ? void 0 : sn.type) === NodeType.Element && (sn == null ? void 0 : sn.tagName.toUpperCase()) === "HTML") {
           const { documentElement, head } = iframeEl.contentDocument;
           this.insertStyleRules(
             documentElement,
@@ -28273,7 +28353,7 @@
           mutation.parentId
         );
         if (!parent) {
-          if (mutation.node.type === NodeType$2.Document) {
+          if (mutation.node.type === NodeType.Document) {
             return this.newDocumentQueue.push(mutation);
           }
           return queue.push(mutation);
@@ -28335,7 +28415,7 @@
           return;
         }
         const parentSn = mirror2.getMeta(parent);
-        if (parentSn && parentSn.type === NodeType$2.Element && mutation.node.type === NodeType$2.Text) {
+        if (parentSn && parentSn.type === NodeType.Element && mutation.node.type === NodeType.Text) {
           const prospectiveSiblings = Array.isArray(parent.childNodes) ? parent.childNodes : Array.from(parent.childNodes);
           if (parentSn.tagName === "textarea") {
             for (const c2 of prospectiveSiblings) {
@@ -28351,9 +28431,9 @@
               }
             }
           }
-        } else if ((parentSn == null ? void 0 : parentSn.type) === NodeType$2.Document) {
+        } else if ((parentSn == null ? void 0 : parentSn.type) === NodeType.Document) {
           const parentDoc = parent;
-          if (mutation.node.type === NodeType$2.DocumentType && ((_a2 = parentDoc.childNodes[0]) == null ? void 0 : _a2.nodeType) === Node.DOCUMENT_TYPE_NODE)
+          if (mutation.node.type === NodeType.DocumentType && ((_a2 = parentDoc.childNodes[0]) == null ? void 0 : _a2.nodeType) === Node.DOCUMENT_TYPE_NODE)
             parentDoc.removeChild(parentDoc.childNodes[0]);
           if (target.nodeName === "HTML" && parentDoc.documentElement)
             parentDoc.removeChild(
@@ -28437,7 +28517,12 @@
           }
           return this.warnNodeNotFound(d, mutation.id);
         }
-        target.textContent = mutation.value;
+        const parentEl = target.parentElement;
+        if (mutation.value && parentEl && parentEl.tagName === "STYLE") {
+          target.textContent = adaptCssForReplay(mutation.value, this.cache);
+        } else {
+          target.textContent = mutation.value;
+        }
         if (this.usingVirtualDom) {
           const parent = target.parentNode;
           if (((_a2 = parent == null ? void 0 : parent.rules) == null ? void 0 : _a2.length) > 0) parent.rules = [];
@@ -28554,7 +28639,7 @@
           left: d.x,
           behavior: isSync ? "auto" : "smooth"
         });
-      } else if ((sn == null ? void 0 : sn.type) === NodeType$2.Document) {
+      } else if ((sn == null ? void 0 : sn.type) === NodeType.Document) {
         (_b = target.defaultView) == null ? void 0 : _b.scrollTo({
           top: d.y,
           left: d.x,
@@ -29560,6 +29645,14 @@
     }
   }, "isActionEvent");
 
+  // ../browser-lib/src/session-record-replay/disable-interactive-elements.ts
+  var disableInteractiveElements = /* @__PURE__ */ __name((element) => {
+    element.querySelectorAll("a, button, input").forEach((a2) => {
+      a2.addEventListener("click", (event) => event.preventDefault());
+      a2.addEventListener("keydown", (event) => event.preventDefault());
+    });
+  }, "disableInteractiveElements");
+
   // ../browser-lib/src/session-record-replay/session-replayer.ts
   var DEBUG_MODE = false;
   var SessionReplayer = class {
@@ -29569,15 +29662,16 @@
       this.config = {
         enableInteract: false
       };
-      this.overlayElement = null;
+      this.eventCastSubscribers = {};
+      this.newRRWebSeekMode = false;
       this.timer = null;
       this.animationFrameStepHandler = {
         wait: /* @__PURE__ */ __name((callback) => requestAnimationFrame(callback), "wait"),
         cancel: /* @__PURE__ */ __name((id) => cancelAnimationFrame(id), "cancel")
       };
-      this.timoutStepHandler = {
+      this.timeoutStepHandler = {
         wait: /* @__PURE__ */ __name((callback) => {
-          return setTimeout(callback, 100);
+          return setTimeout(callback, 10);
         }, "wait"),
         cancel: /* @__PURE__ */ __name((id) => clearTimeout(id), "cancel")
       };
@@ -29603,18 +29697,21 @@
        * @param timestamp - timestamp to get the last event timestamp before it
        * @returns last event timestamp before or in the given timestamp
        */
-      this.getLastEventTimestamp = /* @__PURE__ */ __name((timestamp) => {
-        const event = this.interactionEventsTimestamps.sort((a2, b) => a2.timestamp - b.timestamp).reverse().find((e2) => e2.timestamp <= timestamp);
-        return event?.timestamp;
-      }, "getLastEventTimestamp");
-      // store each event for debug and check ids of events and timestamps, if one exists
-      this.debugData = {
-        active: false,
-        events: [],
-        castedEvents: []
-      };
+      this.getLastInteractionEventTimestamp = /* @__PURE__ */ __name((timestamp) => {
+        return this.interactionEventsTimestamps.sort((a2, b) => a2 - b).reverse().find((e2) => e2 <= timestamp);
+      }, "getLastInteractionEventTimestamp");
       this.config = { ...this.config, ...config };
       this.replayerListenersManager = new ReplayerListenersManager();
+      window.addEventListener("message", async (e2) => {
+        try {
+          const { data } = e2;
+          if (data.type === "setNewRRWebSeekMode") {
+            console.log("setNewRRWebSeekMode", data.payload);
+            this.setNewRRWebSeekMode(data.payload);
+          }
+        } catch (e3) {
+        }
+      });
     }
     static {
       __name(this, "SessionReplayer");
@@ -29623,7 +29720,7 @@
       const playerConfig = {
         mouseTail: false,
         pauseAnimation: false,
-        speed: 64,
+        speed: 360,
         triggerFocus: true,
         UNSAFE_replayCanvas: true,
         liveMode: true,
@@ -29649,20 +29746,44 @@
       } else {
         this.replayer.play();
       }
-      this.firstEvent = events[0];
       if (DEBUG_MODE) {
         this.setupDebugMode();
       }
       this.replayer.on(ReplayerEvents.EventCast, (event) => {
-        this.storeCastedEvent(event);
-        if (this.onEventCast) {
-          this.onEventCast(event);
+        this.notifyEventCastSubscribers(event);
+      });
+      this.disableInteractiveElements();
+    }
+    subscribeToEventCast(id, callback) {
+      this.eventCastSubscribers[id] = callback;
+    }
+    unsubscribeFromEventCast(id) {
+      delete this.eventCastSubscribers[id];
+    }
+    notifyEventCastSubscribers(event) {
+      Object.values(this.eventCastSubscribers).forEach((callback) => {
+        try {
+          callback(event);
+        } catch (e2) {
+          console.error(
+            "[notifyEventCastSubscribers] Error in event cast subscriber",
+            e2
+          );
         }
       });
     }
+    setNewRRWebSeekMode(active) {
+      this.newRRWebSeekMode = active;
+    }
+    getFirstEventTimestamp() {
+      return this.replayer.getMetaData().startTime;
+    }
+    getLastEventTimestamp() {
+      return this.replayer.getMetaData().endTime;
+    }
     getCurrentTimestamp() {
       try {
-        return this.replayer.getCurrentTime() + this.firstEvent.timestamp;
+        return this.replayer.getCurrentTime() + this.getFirstEventTimestamp();
       } catch (e2) {
         return 0;
       }
@@ -29680,7 +29801,7 @@
         if (targetTime && currentTime >= targetTime) {
           console.log(
             `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}, event timestamp:`,
-            this.firstEvent.timestamp + currentTime
+            this.getFirstEventTimestamp() + currentTime
           );
           onTargetHook();
           stopTimer();
@@ -29699,14 +29820,26 @@
     }
     seek(ts, pause = true) {
       return new Promise((resolve2) => {
-        const delta = ts - this.firstEvent.timestamp;
-        this.monitorTime(delta, () => {
-          if (pause) {
-            this.replayer.pause();
-          }
-          resolve2();
-        });
-        this.replayer.play(delta);
+        if (this.newRRWebSeekMode) {
+          this.subscribeToEventCast("seek", (event) => {
+            if (event.timestamp >= ts) {
+              console.log("pausing replayer");
+              this.unsubscribeFromEventCast("seek");
+              this.replayer.pause();
+              resolve2();
+            }
+          });
+          this.replayer.play();
+        } else {
+          const delta = ts - this.getFirstEventTimestamp();
+          this.monitorTime(delta, () => {
+            if (pause) {
+              this.replayer.pause();
+            }
+            resolve2();
+          });
+          this.replayer.play(delta);
+        }
       });
     }
     start(options, castedEvents = []) {
@@ -29727,13 +29860,13 @@
       }
       let numberOfCastedEvents = 0;
       const promise = new Promise((resolve2) => {
-        this.onEventCast = () => {
+        this.subscribeToEventCast("fastForward", (event) => {
           numberOfCastedEvents++;
           if (numberOfCastedEvents === events.length) {
-            this.onEventCast = void 0;
+            this.unsubscribeFromEventCast("fastForward");
             resolve2();
           }
-        };
+        });
       });
       for (const event of events) {
         if (event.type === EventType.FullSnapshot) {
@@ -29744,16 +29877,14 @@
           includeBlur: false,
           includeFocus: false
         })) {
-          this.interactionEventsTimestamps.push(event);
+          this.interactionEventsTimestamps.push(event.timestamp);
         }
-        this.lastEvent = event;
-        this.storeEvent(event);
       }
       return promise;
     }
     async goLive() {
       await this.replayerListenersManager.wrapWithLoadingState(async () => {
-        await this.seek(this.lastEvent.timestamp, false);
+        await this.seek(this.getLastEventTimestamp(), false);
         await (0, import_await_sleep3.default)(1e3);
       });
     }
@@ -29769,28 +29900,30 @@
         }
       });
     }
-    storeEvent(event) {
-      if (!this.debugData.active) {
-        return;
-      }
-      this.debugData.events.push(event);
-    }
-    storeCastedEvent(event) {
-      if (!this.debugData.active) {
-        return;
-      }
-      this.debugData.castedEvents.push(event);
+    getReplayerContext() {
+      return this.replayer.service.state.context;
     }
     setupDebugMode() {
-      this.debugData.active = true;
       window.__chkreplayer = {
-        events: /* @__PURE__ */ __name(() => this.debugData.events, "events"),
-        stringifyEvents: /* @__PURE__ */ __name(() => this.debugData.events.map(stringifyEvent), "stringifyEvents"),
-        stringifyActionEvents: /* @__PURE__ */ __name(() => this.debugData.events.filter((e2) => isActionEvent(e2)).map(stringifyEvent), "stringifyActionEvents"),
+        events: /* @__PURE__ */ __name(() => this.getReplayerContext().events, "events"),
+        stringifyEvents: /* @__PURE__ */ __name(() => this.getReplayerContext().events.map(stringifyEvent), "stringifyEvents"),
+        stringifyActionEvents: /* @__PURE__ */ __name(() => this.getReplayerContext().events.filter((e2) => isActionEvent(e2)).map(stringifyEvent), "stringifyActionEvents"),
         back: /* @__PURE__ */ __name((ts) => this.goBack(ts), "back"),
+        live: /* @__PURE__ */ __name(() => this.goLive(), "live"),
         currentTime: /* @__PURE__ */ __name(() => this.replayer.getCurrentTime(), "currentTime"),
-        castedEvents: /* @__PURE__ */ __name(() => this.debugData.castedEvents, "castedEvents")
+        getReplayer: /* @__PURE__ */ __name(() => this.replayer, "getReplayer"),
+        getThis: /* @__PURE__ */ __name(() => this, "getThis")
       };
+    }
+    disableInteractiveElements() {
+      const document2 = this.replayer.iframe.contentDocument || this.replayer.iframe.contentWindow.document;
+      const observer = new MutationObserver(
+        () => disableInteractiveElements(document2)
+      );
+      observer.observe(document2, {
+        childList: true,
+        subtree: true
+      });
     }
   };
 
@@ -31731,10 +31864,15 @@
         return;
       }
       const iframeOffset = { left: 0, top: 0, right: 0, bottom: 0 };
+      let combinedScaleX = 1;
+      let combinedScaleY = 1;
       if (renderDocument !== element.ownerDocument) {
         let iframe = element.ownerDocument.defaultView?.frameElement;
         while (iframe && iframe.contentDocument !== renderDocument) {
           const iframeRect = iframe.getBoundingClientRect();
+          const computedScaling = this.getScaleFromStyles(iframe);
+          combinedScaleX *= computedScaling.scaleX;
+          combinedScaleY *= computedScaling.scaleY;
           iframeOffset.left += iframeRect.left;
           iframeOffset.top += iframeRect.top;
           iframe = iframe.ownerDocument.defaultView?.frameElement;
@@ -31744,16 +31882,16 @@
       const isFixed = isAncestorOrSelfFixed(element);
       const elementBoundingBox = element.getBoundingClientRect();
       const elementPositionWithOffset = {
-        top: elementBoundingBox.top + iframeOffset.top,
-        left: elementBoundingBox.left + iframeOffset.left
+        top: elementBoundingBox.top * combinedScaleY + iframeOffset.top,
+        left: elementBoundingBox.left * combinedScaleX + iframeOffset.left
       };
       const newElement = elementDocument.createElement("div");
       newElement.style.outline = "2px dashed rgba(255,0,0,.75)";
       newElement.style.position = isFixed ? "fixed" : "absolute";
       newElement.style.left = elementPositionWithOffset.left + "px";
       newElement.style.top = elementPositionWithOffset.top + "px";
-      newElement.style.width = elementBoundingBox.width + "px";
-      newElement.style.height = elementBoundingBox.height + "px";
+      newElement.style.width = elementBoundingBox.width * combinedScaleX + "px";
+      newElement.style.height = elementBoundingBox.height * combinedScaleY + "px";
       newElement.style.pointerEvents = pointerEvents ?? "none";
       newElement.style.zIndex = "2147483647";
       newElement.className = ["checksum-dom-cache-ignore", ...classNames].join(
@@ -31833,6 +31971,24 @@
       if (scroll) {
         new ScrollHelper(element).scrollIntoView({ scrollIfNotInView: false });
       }
+    }
+    /*
+     * iframe might be scaled using CSS.
+     * To properly highlight the element we have to get the scale from the CSS styles
+     * */
+    getScaleFromStyles(iframe) {
+      const computedStyle = window.getComputedStyle(iframe);
+      const transform = computedStyle.transform;
+      if (transform.startsWith("matrix")) {
+        const scaleX = parseFloat(transform.split(",")[0].replace("matrix(", "")) || 1;
+        const scaleY = parseFloat(transform.split(",")[3]) || 1;
+        return { scaleX, scaleY };
+      } else if (computedStyle.scale) {
+        const scaleX = parseFloat(computedStyle.scale) || 1;
+        const scaleY = parseFloat(computedStyle.scale) || 1;
+        return { scaleX, scaleY };
+      }
+      return { scaleX: 1, scaleY: 1 };
     }
     mergeStyle(element, styles) {
       for (const key in styles) {
@@ -35887,6 +36043,9 @@ ${data.locator}`
     }
     getCurrentTimestamp() {
       return this.sessionReplayer.getCurrentTimestamp();
+    }
+    setNewRRWebSeekMode(active) {
+      this.sessionReplayer.setNewRRWebSeekMode(active);
     }
     openSeekbar() {
       if (!this.seeker) {

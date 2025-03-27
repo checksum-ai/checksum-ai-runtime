@@ -11,7 +11,7 @@ import {
   Dialog,
 } from "@playwright/test";
 
-import { ExpectWrapper } from "./index.helpers";
+// import { ExpectWrapper } from "./index.helpers";
 interface ChecksumAIMethod {
   (title: string): IChecksumPage;
   <T>(title: string, body: () => T | Promise<T>): Promise<T>;
@@ -207,6 +207,19 @@ export type RuntimeOptions = {
    * Create a new PR for auto healed tests
    */
   autoHealPRs?: boolean;
+
+  /**
+   * Model configuration
+   */
+  modelConfig?: Partial<{
+    skipCompleteOriginHeaderOnDisableWebSecurity?: boolean;
+    browserArgs?: Partial<{
+      skipDisableWebSecurity?: boolean;
+      skipAllowFileAccessFromFiles?: boolean;
+      skipDisableSiteIsolationTrials?: boolean;
+      skipAllowRunningInsecureContent?: boolean;
+    }>;
+  }>;
 };
 
 export type ChecksumConfig = {
@@ -292,6 +305,11 @@ export type ChecksumAI = {
   (description: string, testFunction: Function): Promise<any>;
   withDialog: ChecksumAI;
 };
+
+interface DefineChecksumIdMethod {
+  (title: string, testId: undefined, flowId: string): string;
+  (title: string, testId: string, flowId?: string): string;
+}
 /**
  * Initialize Checksum runtime
  *
@@ -300,7 +318,7 @@ export type ChecksumAI = {
 export function init(base?: ChecksumTestType<PlaywrightTestArgs>): {
   test: ChecksumTestType<ChecksumPlaywrightTestArgs>;
   login: ReturnType<typeof getLogin>;
-  defineChecksumTest: (title: string, testId: string) => string;
+  defineChecksumTest: DefineChecksumIdMethod;
   expect: IChecksumExpect;
   checksumAI: ChecksumAI;
   getEnvironment: ({
@@ -328,4 +346,15 @@ export enum Locators {
   FrameLocator = "frameLocator",
 }
 
-// export type PWLocators = Pick<Locator, EnumValues<typeof Locators>>;
+export class ExpectWrapper<ExtendedMatchers, T> {
+  expecter: Expect<ExtendedMatchers>;
+  apply(e: T) {
+    return this.expecter<T>(e);
+  }
+  soft(e: T) {
+    return this.expecter.soft<T>(e);
+  }
+  poll(e: T) {
+    return this.expecter.poll<T>(() => e);
+  }
+}
