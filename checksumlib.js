@@ -29654,7 +29654,7 @@
   }, "disableInteractiveElements");
 
   // ../browser-lib/src/session-record-replay/session-replayer.ts
-  var DEBUG_MODE = false;
+  var DEBUG_MODE = true;
   var SessionReplayer = class {
     constructor(config = {}) {
       this.interactionEventsTimestamps = [];
@@ -29706,7 +29706,6 @@
         try {
           const { data } = e2;
           if (data.type === "setNewRRWebSeekMode") {
-            console.log("setNewRRWebSeekMode", data.payload);
             this.setNewRRWebSeekMode(data.payload);
           }
         } catch (e3) {
@@ -29753,6 +29752,14 @@
         this.notifyEventCastSubscribers(event);
       });
       this.disableInteractiveElements();
+      if (this.newRRWebSeekMode) {
+        const timer = this.getReplayerContext().timer;
+        this.timerAddAction = timer.addAction.bind(timer);
+        timer.addAction = (action) => {
+          action.delay = 0;
+          return this.timerAddAction(action);
+        };
+      }
     }
     subscribeToEventCast(id, callback) {
       this.eventCastSubscribers[id] = callback;
@@ -29787,60 +29794,6 @@
       } catch (e2) {
         return 0;
       }
-    }
-    monitorTime(targetTime, onTargetHook, stepHandler = this.animationFrameStepHandler) {
-      const stopTimer = /* @__PURE__ */ __name(() => {
-        if (this.timer) {
-          stepHandler.cancel(this.timer);
-          this.timer = null;
-        }
-      }, "stopTimer");
-      stopTimer();
-      const update = /* @__PURE__ */ __name(() => {
-        const currentTime = this.replayer.getCurrentTime();
-        if (targetTime && currentTime >= targetTime) {
-          console.log(
-            `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}, event timestamp:`,
-            this.getFirstEventTimestamp() + currentTime
-          );
-          onTargetHook();
-          stopTimer();
-          return;
-        } else {
-          console.log(
-            `[SessionReplayer] monitoring time, current: ${currentTime}; target: ${targetTime}...`
-          );
-        }
-        const meta = this.replayer.getMetaData();
-        if (currentTime < meta.totalTime) {
-          this.timer = stepHandler.wait(update);
-        }
-      }, "update");
-      this.timer = stepHandler.wait(update);
-    }
-    seek(ts, pause = true) {
-      return new Promise((resolve2) => {
-        if (this.newRRWebSeekMode) {
-          this.subscribeToEventCast("seek", (event) => {
-            if (event.timestamp >= ts) {
-              console.log("pausing replayer");
-              this.unsubscribeFromEventCast("seek");
-              this.replayer.pause();
-              resolve2();
-            }
-          });
-          this.replayer.play();
-        } else {
-          const delta = ts - this.getFirstEventTimestamp();
-          this.monitorTime(delta, () => {
-            if (pause) {
-              this.replayer.pause();
-            }
-            resolve2();
-          });
-          this.replayer.play(delta);
-        }
-      });
     }
     start(options, castedEvents = []) {
     }
@@ -29881,6 +29834,66 @@
         }
       }
       return promise;
+    }
+    monitorTime(targetTime, onTargetHook, stepHandler = this.animationFrameStepHandler) {
+      const stopTimer = /* @__PURE__ */ __name(() => {
+        if (this.timer) {
+          stepHandler.cancel(this.timer);
+          this.timer = null;
+        }
+      }, "stopTimer");
+      stopTimer();
+      const update = /* @__PURE__ */ __name(() => {
+        const currentTime = this.replayer.getCurrentTime();
+        if (targetTime && currentTime >= targetTime) {
+          console.log(
+            `[SessionReplayer] achieved target time: ${targetTime} with current time ${currentTime}, event timestamp:`,
+            this.getFirstEventTimestamp() + currentTime
+          );
+          onTargetHook();
+          stopTimer();
+          return;
+        } else {
+          console.log(
+            `[SessionReplayer] monitoring time, current: ${currentTime}; target: ${targetTime}...`
+          );
+        }
+        const meta = this.replayer.getMetaData();
+        if (currentTime < meta.totalTime) {
+          this.timer = stepHandler.wait(update);
+        }
+      }, "update");
+      this.timer = stepHandler.wait(update);
+    }
+    async seek(ts, pause = true) {
+      return new Promise((resolve2) => {
+        if (this.newRRWebSeekMode) {
+          this.subscribeToEventCast("seek", (event) => {
+            if (event.timestamp >= ts) {
+              this.unsubscribeFromEventCast("seek");
+              if (pause) {
+                this.replayer.pause();
+                requestAnimationFrame(() => {
+                  this.getReplayerContext().timer.clear();
+                  resolve2();
+                });
+                return;
+              }
+              resolve2();
+            }
+          });
+          this.replayer.play();
+        } else {
+          const delta = ts - this.getFirstEventTimestamp();
+          this.monitorTime(delta, () => {
+            if (pause) {
+              this.replayer.pause();
+            }
+            resolve2();
+          });
+          this.replayer.play(delta);
+        }
+      });
     }
     async goLive() {
       await this.replayerListenersManager.wrapWithLoadingState(async () => {
