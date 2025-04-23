@@ -145,6 +145,11 @@ type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {
 export interface IChecksumExpect<ExtendedMatchers = {}>
   extends Expect<ExtendedMatchers> {
   checksumAI: (thought: string) => IChecksumExpect<ExtendedMatchers>;
+  skipAIFallback: <T = unknown>(
+    actual: T,
+    messageOrOptions?: string | { message?: string }
+  ) => MakeMatchers<void, T, ExtendedMatchers>;
+
   <T = unknown>(
     actual: T,
     messageOrOptions?:
@@ -300,10 +305,14 @@ type ChecksumTestType<TestArgs> = TestType<
   TestArgs & PlaywrightTestOptions,
   PlaywrightWorkerArgs & PlaywrightWorkerOptions
 >;
-
+export type ChecksumAIOptions = {
+  withDialog?: boolean;
+  skipAIFallback?: boolean;
+};
 export type ChecksumAI = {
   (description: string, testFunction: Function): Promise<any>;
-  withDialog: ChecksumAI;
+} & {
+  [K in keyof ChecksumAIOptions]: ChecksumAI;
 };
 
 interface DefineChecksumIdMethod {
