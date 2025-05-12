@@ -6,3 +6,4 @@ node_modules/
 .auth
 .eval.checksum.spec.ts
 *.rrweb.json.jsonl
+*.rrweb.jsonl
