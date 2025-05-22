@@ -191,7 +191,9 @@ export type RuntimeOptions = {
   /**
    * Whether to use Checksum AI when trying to perform an action or an assertion
    */
-  useChecksumAI: boolean | { actions: boolean; assertions: boolean };
+  useChecksumAI:
+    | boolean
+    | { actions: boolean; assertions: boolean; visualComparison?: boolean };
   /**
    * Add new assertions
    */
