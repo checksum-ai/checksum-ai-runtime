@@ -249,6 +249,14 @@ interface ChecksumPage extends Page {
     */
   checksumSelector: (id: string) => ChecksumPage;
 
+  /**
+   * Wraps a test step allowing ChecksumAI to recover from failures or even generate
+   * the required Playwright code when no callback is provided.
+   * Can be chained with `.withDialog` to automatically listen to browser dialogs
+   * or with `.skipAIFallback` to prevent recovery attempts.
+   */
+  checksumAI: (thought: string, body?: () => any) => Promise<any> | ChecksumPage;
+
    /**
     * For tests requiring file uploads, this method resolves to the configured assets folder storing all relevant files
     */ 
@@ -258,6 +266,21 @@ interface ChecksumPage extends Page {
    * For multi-tab test flows, this method gets the ChecksumPage in order of appearance, when 0 is the initially opened tab.
    */
   getPage(index: number): Promise<ChecksumPage>;
+
+  /**
+   * Creates a compound selection by grouping multiple anchors and optionally
+   * resolving a target element relative to their common parent.
+   */
+  compoundSelection: {
+    (
+      anchors: (base: Locator) => Array<Locator | string>,
+      target?: (base: Locator) => Locator | string
+    ): ChecksumLocator;
+    (selection: {
+      anchors: (base: Locator) => Array<Locator | string>;
+      target?: (base: Locator) => Locator | string;
+    }): ChecksumLocator;
+  };
 
   /**
    * When required to login mid-test, use reauthenticate with the user's role. Note: It is not possible to change environments during a single test run.
@@ -366,8 +389,12 @@ interface ChecksumLocator extends Locator {
 ## CLI Commands
 
 1. `init` - Initialize the Checksum directory and configurations.
-2. `test` - Run Checksum tests. Accepts all [Playwright command line flags](https://playwright.dev/docs/test-cli). To override `checksum.config.ts`, pass full or partial JSON as a string, e.g., `--cksm-config='{"baseURL": "https://example.com"}'`.
+2. `test` - Run Checksum tests. Accepts all [Playwright command line flags](https://playwright.dev/docs/test-cli). To override `checksum.config.ts`, pass full or partial JSON as a string using `--cksm-config`. Use `--cksm-title="<message>"` to set a custom commit message for the run.
 3. `show-report` - Locally shows the latest test run HTML report. Only applicable following completion of a test run configured to output an HTML report.
+4. `dotenv` - Manage environment variables. Run `checksum dotenv --download` to download the `.env` file for your project. An `--api-key` argument can be supplied if not present in `checksum.config.ts`.
+    Examples:
+    - `checksum dotenv --download`
+    - `checksum dotenv --download --api-key=<apiKey>`
 
 ## Running with GitHub Actions
 
