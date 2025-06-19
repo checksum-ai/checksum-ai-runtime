@@ -182,7 +182,11 @@ export enum RunMode {
   Heal = "heal",
   Refactor = "refactor",
 }
-
+export enum AutoRecoveryMode {
+  Regular = "regular",
+  Fast = "fast",
+  ExtraFast = "extra_fast",
+}
 export type RuntimeOptions = {
   /**
    * Whether to use Checksum Smart Selector when trying to locate an element to perform an action
@@ -193,7 +197,12 @@ export type RuntimeOptions = {
    */
   useChecksumAI:
     | boolean
-    | { actions: boolean; assertions: boolean; visualComparison?: boolean };
+    | {
+        actions: boolean;
+        assertions: boolean;
+        visualComparison?: boolean;
+        arMode?: AutoRecoveryMode;
+      };
   /**
    * Add new assertions
    */
@@ -268,7 +277,7 @@ export type EnvironmentUser = {
 export type ChecksumLoginFunctionParams<PayloadType = any> = {
   environment: ChecksumConfigEnvironment;
   user: EnvironmentUser;
-  config: ChecksumConfig;
+  config?: ChecksumConfig;
   payload?: PayloadType;
 };
 
@@ -368,4 +377,8 @@ export class ExpectWrapper<ExtendedMatchers, T> {
   poll(e: T) {
     return this.expecter.poll<T>(() => e);
   }
+}
+
+declare global {
+  const repl: (cliMode?: boolean, messageFileSuffix?: string) => string;
 }
