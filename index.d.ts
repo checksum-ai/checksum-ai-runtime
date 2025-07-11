@@ -236,6 +236,11 @@ export type RuntimeOptions = {
       skipAllowRunningInsecureContent?: boolean;
     }>;
   }>;
+
+  /**
+   * Time to wait before initializing the browser script [ms]
+   */
+  browserScriptInitWait?: number;
 };
 
 export type ChecksumConfig = {

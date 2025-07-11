@@ -391,10 +391,10 @@ interface ChecksumLocator extends Locator {
 1. `init` - Initialize the Checksum directory and configurations.
 2. `test` - Run Checksum tests. Accepts all [Playwright command line flags](https://playwright.dev/docs/test-cli). To override `checksum.config.ts`, pass full or partial JSON as a string using `--cksm-config`. Use `--cksm-title="<message>"` to set a custom commit message for the run.
 3. `show-report` - Locally shows the latest test run HTML report. Only applicable following completion of a test run configured to output an HTML report.
-4. `dotenv` - Manage environment variables. Run `checksum dotenv --download` to download the `.env` file for your project. An `--api-key` argument can be supplied if not present in `checksum.config.ts`.
+4. `dotenv` - Manage environment variables. Use `--download` to download the `.env` file for your project. An `--api-key` argument can be supplied if not present in `checksum.config.ts`.
     Examples:
-    - `checksum dotenv --download`
-    - `checksum dotenv --download --api-key=<apiKey>`
+    - `npx checksumai dotenv --download`
+    - `npx checksumai dotenv --download --api-key=<apiKey>`
 
 ## Running with GitHub Actions
 
