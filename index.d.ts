@@ -238,11 +238,6 @@ export type RuntimeOptions = {
   }>;
 
   /**
-   * Time to wait before adding the browser script [ms]
-   */
-  browserScriptAddWait?: number;
-
-  /**
    * Time to wait before initializing the browser script [ms]
    */
   browserScriptInitWait?: number;
