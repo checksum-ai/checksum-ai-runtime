@@ -8,3 +8,4 @@ node_modules/
 *.rrweb.json.jsonl
 *.rrweb.jsonl
 .chk/
+test-instrumentation/

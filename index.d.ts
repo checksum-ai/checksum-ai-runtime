@@ -297,7 +297,7 @@ export type ChecksumLoginFunction<PayloadType = any> = (
 ) => Promise<void>;
 
 export function getLogin(): (
-  page: Page,
+  page: Page | IChecksumPage,
   { role, environment }?: { role?: string; environment?: string }
 ) => Promise<void>;
 
