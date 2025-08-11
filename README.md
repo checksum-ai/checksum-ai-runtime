@@ -131,8 +131,11 @@ Alongside standard test run configurations found in `playwright.config.ts`, use 
     /**
      * Whether to use Checksum AI in order to 
      * recover from a failed action or assertion
+     * @actions - enable recovery from checksumAI steps
+     * @assertions - enable recovery from assertion steps
+     * @visualComparison - enable visual comparison recovery when using toHaveScreenshot assertions 
      */
-    useChecksumAI: { actions: true, assertions: false },
+    useChecksumAI: { actions: true, assertions: false, visualComparison: false },
     /**
      * Whether to use recorded network responses when running your tests
      */
