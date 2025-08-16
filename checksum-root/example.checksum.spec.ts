@@ -2,7 +2,7 @@ import { init } from "@checksum-ai/runtime";
 const { test, defineChecksumTest, login, expect, checksumAI } = init();
 
 test.describe("Example test", () => {
-  test.beforeEach(async (page) => {
+  test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
