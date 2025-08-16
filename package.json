@@ -10,7 +10,6 @@
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin": "^3.2.3",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "request": "^2.88.2",
     "rrweb": "2.0.0-alpha.18",
     "ts-node": "^10.9.1",
     "@monaco-editor/react": "^4.6.0",
