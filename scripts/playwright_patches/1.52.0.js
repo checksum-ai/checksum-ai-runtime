@@ -291,6 +291,21 @@ function stackTrace(projectRoot) {
   }
 
   let originalContent, newContent;
+
+  // Create a regex for getting a file for each line in the stacktrace that overrides the original regex
+  // This regex is only used for getting files, the original regex is sitll used for the rest of the content
+  originalContent = `let file = match[7];`;
+  const fileRe = /(\/.*?\.[a-zA-Z0-9]+)(?=:\d+:\d+)/;
+  newContent = `
+  const fileRe = new RegExp(${JSON.stringify(fileRe.source)}, "${
+    fileRe.flags
+  }");
+  const m = fileRe.exec(match[0] ?? "");
+  let file = m ? m[1] : undefined;
+  `;
+  replaceContent(file, originalContent, newContent);
+
+  // Filter out checksum-ai/runtime from stack traces
   originalContent = `return stack.split("\\n");`;
   newContent = `return stack.split("\\n").filter(s=>!s.includes('@checksum-ai/runtime'));`;
   replaceContent(file, originalContent, newContent);
