@@ -311,6 +311,30 @@ function stackTrace(projectRoot) {
   replaceContent(file, originalContent, newContent);
 }
 
+function reportTraceFile(projectRoot) {
+  const file = join(
+    projectRoot,
+    "node_modules/playwright/lib/reporters/html.js"
+  );
+  if (!doesFileExist(file)) {
+    return;
+  }
+
+  let originalContent, newContent;
+
+  originalContent = `const buffer = import_fs.default.readFileSync(a.path);`;
+  newContent = `let buffer = import_fs.default.readFileSync(a.path);
+          if (a.name === "trace") {
+            let retries = 2;
+            while (!buffer.slice(0,100).toString().startsWith("checksum-playwright-trace") && retries > 0) {
+              Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000);
+              buffer = import_fs.default.readFileSync(a.path)
+              retries--;
+            }
+          }`;
+  replaceContent(file, originalContent, newContent);
+}
+
 // -------- [Run] -------- //
 
 const isRuntime = true || process.env.RUNTIME === "true";
@@ -327,6 +351,7 @@ function run(projectPath) {
         channelOwner(projectPath);
         stackTrace(projectPath);
         indexContent(projectPath);
+        reportTraceFile(projectPath);
       }
     } else {
       console.warn("Project path not found", projectPath);
