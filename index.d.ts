@@ -194,6 +194,8 @@ export type RuntimeOptions = {
   useChecksumSelectors: boolean;
   /**
    * Whether to use Checksum AI when trying to perform an action or an assertion
+   * @param arVersion - Whether to use the new auto recovery system. If not provided, it will use the old AR system.
+   * 1- basic AR, 2 - new AR
    */
   useChecksumAI:
     | boolean
@@ -201,7 +203,8 @@ export type RuntimeOptions = {
         actions: boolean;
         assertions: boolean;
         visualComparison?: boolean;
-        arMode?: AutoRecoveryMode;
+        arMode?: AutoRecoveryMode; 
+        arVersion?: 1|2;
       };
   /**
    * Add new assertions
