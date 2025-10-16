@@ -256,7 +256,7 @@ interface ChecksumPage extends Page {
    * Wraps a test step allowing ChecksumAI to recover from failures or even generate
    * the required Playwright code when no callback is provided.
    * Can be chained with `.withDialog` to automatically listen to browser dialogs
-   * or with `.skipAIFallback` to prevent recovery attempts.
+   * or with `.skipAutoRecovery` to prevent recovery attempts.
    */
   checksumAI: (thought: string, body?: () => any) => Promise<any> | ChecksumPage;
 

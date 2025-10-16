@@ -145,10 +145,10 @@ type ChecksumMakeMatchers<MakeMatchers> = MakeMatchers & {
 export interface IChecksumExpect<ExtendedMatchers = {}>
   extends Expect<ExtendedMatchers> {
   checksumAI: (thought: string) => IChecksumExpect<ExtendedMatchers>;
-  skipAIFallback: <T = unknown>(
+  skipAutoRecovery: IChecksumExpect<ExtendedMatchers> & (<T = unknown>(
     actual: T,
     messageOrOptions?: string | { message?: string }
-  ) => MakeMatchers<void, T, ExtendedMatchers>;
+  ) => MakeMatchers<void, T, ExtendedMatchers>);
 
   <T = unknown>(
     actual: T,
@@ -203,6 +203,7 @@ export type RuntimeOptions = {
         actions: boolean;
         assertions: boolean;
         visualComparison?: boolean;
+        skipTestsWithKnownBugs?: boolean;
         arMode?: AutoRecoveryMode; 
         arVersion?: 1|2;
       };
@@ -331,7 +332,7 @@ type ChecksumTestType<TestArgs> = TestType<
 >;
 export type ChecksumAIOptions = {
   withDialog?: boolean;
-  skipAIFallback?: boolean;
+  skipAutoRecovery?: boolean;
 };
 export type ChecksumAI = {
   (description: string, testFunction: Function): Promise<any>;
