@@ -14,7 +14,7 @@ import {
 // import { ExpectWrapper } from "./index.helpers";
 interface ChecksumAIMethod {
   (title: string): IChecksumPage;
-  <T>(title: string, body: () => T | Promise<T>): Promise<T>;
+  <T>(title: string, body: () => T | Promise<T>, options?: ChecksumAIOptions): Promise<T>;
 }
 
 type EnumValues<T> = T[keyof T];
@@ -335,7 +335,7 @@ export type ChecksumAIOptions = {
   skipAutoRecovery?: boolean;
 };
 export type ChecksumAI = {
-  (description: string, testFunction: Function): Promise<any>;
+  (description: string, testFunction: Function, options?: ChecksumAIOptions): Promise<any>;
 } & {
   [K in keyof ChecksumAIOptions]: ChecksumAI;
 };
