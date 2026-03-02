@@ -7,7 +7,7 @@ test.describe("Example test", () => {
   });
 
   test(
-    defineChecksumTest("Navigate to home page", "TEST_ID"),
+    defineChecksumTest("Navigate to home page", "TSTID"),
     async ({ page }) => {
       await page.goto("/");
     }
