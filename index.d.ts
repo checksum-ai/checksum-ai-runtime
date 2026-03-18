@@ -265,6 +265,11 @@ export type ChecksumConfig = {
    */
   apiKey: string;
 
+  /**
+   * Optional default environment name (used by tooling to pick a default environment).
+   */
+  defaultEnvironmentName?: string;
+
   environments?: ChecksumConfigEnvironment[];
 
   /**
