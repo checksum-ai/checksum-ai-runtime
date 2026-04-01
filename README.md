@@ -4,12 +4,21 @@
 
 1. Install the package using `npm install -D checksumai` or `yarn add checksumai -D`.
 2. Navigate to the directory where you want to initialize the Checksum tests folder and run `npx checksumai init`.
-3. In the newly created "checksum" folder
-   1. Edit `checksum.config.ts` and add the necessary configurations, including your apiKey, application baseURL, environment info, etc.
-   2. Update `login.ts` with your login function using Playwright. See the Login Function section below for guidance.
+3. In the newly created `checksum` folder:
+   1. Edit `checksum.config.ts` and add the necessary configuration, including your API key. Define `BASE_URL` in `checksum/.env` because the starter config reads `process.env.BASE_URL!`.
+   2. Update `login.ts` with your Playwright login flow. See the Login Function section below for the current params-object API.
+   3. Review the starter examples in `checksum/tests/examples/example.checksum.spec.ts` and `checksum/tests/examples/example.checksum.md`.
+   4. Re-running `npx checksumai init` later backfills any missing starter files without overwriting files you already customized.
 4. Run `npx playwright install --with-deps` to install Playwright dependencies.
-5. Run `npx checksumai test` to execute the example test and verify successful login.
+5. Run `npx checksumai test` to execute the starter `.checksum.spec.ts` example and verify your login setup.
 6. If you haven't already, visit [app.checksum.ai](https://app.checksum.ai) to complete the configuration and generate a test. Then, wait for the pull request (PR) to be created and approve it.
+
+### Starter Files
+
+- `checksum/login.ts` shows the runtime login callback signature and where `environment`, `user`, and `config` come from.
+- `checksum/tests/examples/example.checksum.spec.ts` is a minimal TypeScript starter using `init()`, `defineChecksumTest(...)`, and `login(page)`.
+- `checksum/tests/examples/example.checksum.md` is a minimal markdown flow starter. Replace the placeholder `appId` and `checksumTestId` values before using it.
+- Repo Mirror reads both `.checksum.spec.ts` and `.checksum.md` files, so both starter formats are generated during `checksumai init`.
 
 ### Login Function
 
@@ -17,41 +26,30 @@
 2. We recommend using a consistent seeded user for every test. For example, before each test, call a webhook that creates a user, seeds it with data, and returns the username and password. This approach ensures test reliability and allows parallel test execution. Configure this webhook [in your project](https://app.checksum.ai/#/settings/wizard) for consistent test generation.
 3. After logging in, assert that the login was successful. Playwright waits for assertions to be correct, ensuring that the page is ready for interaction before proceeding.
 4. To reuse authentication states between tests, refer to the Playwright guide on [authentication](https://playwright.dev/docs/auth). At the start of the login function, check if the user is already authenticated and return if so.
-5. Use the ChecksumLoginFunction type to correctly implement the login function, as following
+5. Use the `ChecksumLoginFunction` type to correctly implement the login function:
    ```
-    import {
-      ChecksumLoginFunction,
-      ChecksumConfigEnvironment,
-      EnvironmentUser,
-      ChecksumConfig
-    } from "@checksum-ai/runtime"
-    
-    const login: ChecksumLoginFunction<PayloadType> = async (
-      page,
-      {
-        environment, /* selected environment */
-        user, /* selected user */
-        config /* loaded config from checksum.config.ts */,
-        payload /* allowing externally provided payload */
-      }: {
-        environment: ChecksumConfigEnvironment,
-        user: EnvironmentUser,
-        config: ChecksumConfig,
-        payload: PayloadType
-      }
-    ): Promise<void> => {
-      const email = user.username;
-      const password = user.password;
-      const token = payload.token;
-      const url = environment.baseURL;
-      await page.goto(url);
-      ...
-      console.log("Login Successful");
-      return;
-    };
+     import { ChecksumLoginFunction } from "@checksum-ai/runtime";
 
-    exports.default = login;
+     const login: ChecksumLoginFunction = async (
+       page,
+       { environment, user, config }
+     ) => {
+       // environment contains the selected environment from checksum.config.ts.
+       // user contains the selected credentials for that environment.
+       // config is the loaded checksum.config.ts object.
+       const loginUrl = environment.loginURL ?? "/login";
+
+       await page.goto(loginUrl);
+       await page.getByPlaceholder("Email").fill(user.username ?? "");
+       await page.getByPlaceholder("Password").fill(user.password ?? "");
+       await page.getByRole("button", { name: "Log in" }).click();
+       await page.waitForURL(new URL("/", environment.baseURL).toString());
+     };
+
+     export default login;
    ```
+
+When you define multiple environments or roles, helpers like `login(page, { environment, role })` and `getEnvironment({ name, userRole })` decide which `environment` and `user` reach this function.
 
 ## Checksum AI Magic
 
@@ -398,10 +396,6 @@ interface ChecksumLocator extends Locator {
     Examples:
     - `npx checksumai dotenv --download`
     - `npx checksumai dotenv --download --api-key=<apiKey>`
-
-## Running with GitHub Actions
-
-See the example file `github-actions.example.yml`.
 
 ## Troubleshooting
 

@@ -21,8 +21,8 @@ export default getChecksumConfig({
   environments: [
     {
       name: "<The name of the environment>",
-      baseURL:
-        "<The base URL of the tested app. e.g. https://example.com. URLs in the tests will be relative to the base URL>",
+      // Define BASE_URL in checksum/.env before running your tests.
+      baseURL: process.env.BASE_URL!,
       loginURL: "<The URL of the login page>",
       default: true,
       users: [
