@@ -1,10 +1,10 @@
 {
   "name": "@checksum-ai/runtime",
-  "version": "2.0.24",
+  "version": "3.0.0",
   "description": "Checksum.ai test runtime",
   "main": "index.js",
   "dependencies": {
-    "@playwright/test": "1.56.1",
+    "@playwright/test": "1.59.0",
     "dotenv": "^16.4.5",
     "jsdom": "^25.0.1",
     "playwright-extra": "^4.3.6",
