@@ -224,11 +224,6 @@ export type RuntimeOptions = {
    */
   hostReports?: boolean;
   /**
-   * Create a new PR for auto healed tests
-   */
-  autoHealPRs?: boolean;
-
-  /**
    * Delay in ms between consecutive actions (e.g. click→click).
    * Prevents race conditions where onclick handlers aren't registered yet.
    * Set to 0 to disable. Default: 100

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const crypto = require("crypto");
 const { join } = require("path");
 
 // Args
@@ -27,27 +28,57 @@ function amend(filePath, entryPointText, appendText) {
   fs.writeFileSync(filePath, result, "utf8");
 }
 
-// Replaces content.
-// When "on" is true, the new content is written to the file replacing the original content,
-// otherwise the original content is restored.
+// Bracket each injected block with a per-patch unique marker derived from a
+// hash of `originalContent`. See 1.60.0.js for the full rationale — the legacy
+// shared `/* checksumai */ ` marker caused OFF-mode `alwaysInjectScripts`
+// (whose newContent collapses to the bare marker) to clobber the FIRST
+// `/* checksumai */ ` it found, corrupting whichever patch happened to live
+// at the lowest line number.
 function replaceContent(filePath, originalContent, newContent) {
-  // Read the file content
   const fileContent = fs.readFileSync(filePath, "utf8");
 
-  // add a marker for newContent that can be later recognized for "off" state
-  newContent = `/* checksumai */ ${newContent}`;
+  const id = crypto
+    .createHash("sha1")
+    .update(originalContent)
+    .digest("hex")
+    .slice(0, 8);
+  const openMarker = `/*checksumai:${id}*/`;
+  const closeMarker = `/*checksumai:end:${id}*/`;
+  const taggedNewContent = `${openMarker}${newContent}${closeMarker}`;
 
-  if (on && fileContent.includes(newContent)) {
+  if (on) {
+    if (fileContent.includes(taggedNewContent)) {
+      return;
+    }
+    if (!fileContent.includes(originalContent)) {
+      return;
+    }
+    fs.writeFileSync(
+      filePath,
+      fileContent.replace(originalContent, taggedNewContent),
+      "utf8"
+    );
     return;
   }
 
-  // Join the lines back into a single string
-  const updatedContent = on
-    ? fileContent.replace(originalContent, newContent)
-    : fileContent.replace(newContent, originalContent);
+  if (fileContent.includes(taggedNewContent)) {
+    fs.writeFileSync(
+      filePath,
+      fileContent.replace(taggedNewContent, originalContent),
+      "utf8"
+    );
+    return;
+  }
 
-  // Write the modified content back to the file
-  fs.writeFileSync(filePath, updatedContent, "utf8");
+  // Backward-compat: revert legacy single-marker form if present.
+  const legacyTagged = `/* checksumai */ ${newContent}`;
+  if (fileContent.includes(legacyTagged)) {
+    fs.writeFileSync(
+      filePath,
+      fileContent.replace(legacyTagged, originalContent),
+      "utf8"
+    );
+  }
 }
 
 function doesFileExist(filePath) {
