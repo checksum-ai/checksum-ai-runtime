@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@checksum/*": ["./*"]
+    }
+  },
+  "include": ["./tests/**/*", ".chk/**/*"]
+}
